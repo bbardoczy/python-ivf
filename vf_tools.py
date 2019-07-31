@@ -19,18 +19,16 @@ def zgrid_uniform(z_sd,nz=25,nsd=3):
 
 #@jit(nopython=True)
 
-# one concern: egrid is used only for utility. we might need to compute
-# utilities externally
-def v_optimize(m,agrid,egrid,sigma,beta,EV,ns=200,minc=0.001,u=None):
+
+def v_optimize(m,agrid,beta,EV,ns=200,minc=0.001,u=None):
     # this solves consumption-savings problem in the form
-    # u(c,e) + beta*EV(m-c,e), here e refers to any exogenous variable
+    # u(c) + beta*EV(m-c).
     # EV is assumed to be integrated, c is in [minc*m,m].
     # it does so by bruteforcing ns possible points for savings such that
     # s = share*m
     
-    
     if u is None:
-        u = lambda x, z : (x**(1-sigma))/(1-sigma)
+        u = lambda x : np.log(x)
     
     V = np.empty(m.shape,np.float64)
     c = np.empty(m.shape,np.float64)
@@ -45,7 +43,7 @@ def v_optimize(m,agrid,egrid,sigma,beta,EV,ns=200,minc=0.001,u=None):
         
         ap_val = np.expand_dims(mi,1) * sshare
         c_val  = np.expand_dims(mi,1) - ap_val
-        uc    = u(c_val,egrid[iz])
+        uc    = u(c_val)
         
         V_opt, i_opt = v_optimize_one(EV[:,iz],agrid,uc,ap_val,beta)
         
