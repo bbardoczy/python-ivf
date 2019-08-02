@@ -37,6 +37,12 @@ def v_optimize(m,agrid,beta,EV,ns=200,minc=0.001,u=None):
     ns_low = int(ns/4)
     sshare = np.concatenate( (np.linspace(0,0.5,ns_low), np.linspace(0.5+(1/ns),1-minc,ns-ns_low)))
     
+    
+    transform = True if u(1e6) < 0 else False
+    
+    
+    
+    
     for iz in range(0,m.shape[1]):
            
         mi = m[:,iz]
@@ -45,7 +51,7 @@ def v_optimize(m,agrid,beta,EV,ns=200,minc=0.001,u=None):
         c_val  = np.expand_dims(mi,1) - ap_val
         uc    = u(c_val)
         
-        V_opt, i_opt = v_optimize_one(EV[:,iz],agrid,uc,ap_val,beta)
+        V_opt, i_opt = v_optimize_one(EV[:,iz],agrid,uc,ap_val,beta,transform)
         
         #V[:,iz] = V_val [np.arange(0,agrid.size),i_opt]
         
@@ -60,11 +66,17 @@ def v_optimize(m,agrid,beta,EV,ns=200,minc=0.001,u=None):
     
 
 @jit(nopython=True)
-def v_optimize_one(EV_one,agrid,uc,ap,beta):
+def v_optimize_one(EV_one,agrid,uc,ap,beta,transform):
         
+    
     nm = uc.shape[0]
     
-    EV_val = interpolate_vector_matrix(agrid,EV_one,ap)
+    if transform:
+        V_transform = -1/EV_one    
+        EV_val = -1/interpolate_vector_matrix(agrid,V_transform,ap)
+    else:
+        EV_val = interpolate_vector_matrix(agrid,EV_one,ap)
+    
     V_val  = uc + beta*EV_val
     
     i_opt = np.empty(nm,np.int64)
@@ -83,11 +95,32 @@ def v_optimize_one(EV_one,agrid,uc,ap,beta):
     
 
 def smooth_max(v0,v1,eps):
+    
     assert np.all(v0.shape == v1.shape)
     v_max = np.maximum(v0,v1)
-    v_min = np.minimum(v0,v1)
     
-    v_result = v_max + eps * np.log(1+np.exp( (v_min - v_max) / eps))
-    
-    return v_result
+    if eps > 1e-6:
+        v_min = np.minimum(v0,v1)
+        
+        v_result = v_max + eps * np.log(1+np.exp( (v_min - v_max) / eps)) - eps*np.log(2)
+        
+        return v_result
+    else:
+        return v_max
 
+def smooth_p0(v0,v1,eps):
+    
+    assert np.all(v0.shape == v1.shape)
+    
+    
+    if eps <= 1e-6:
+        return np.float64( v0 >= v1 )
+    else:
+                
+        z = np.exp( (v1 - v0) / eps)        
+        return 1/(1+z)
+    # do we need to handle overflow here?
+    
+        
+        
+    

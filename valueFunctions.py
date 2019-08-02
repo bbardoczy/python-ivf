@@ -118,6 +118,34 @@ class valuefunction(gridval):
         plt.plot(x, y, label=label)
         
         return y    
+    
+    def plot_diff(self,other,field,iz=None):
+        import matplotlib.pyplot as plt
+        
+        if iz is None:
+            iz = int(self.grids[1].shape()/2)
+            
+        label1 = ("T" + str(self.time) + "iz" + str(iz))
+        if self.description is not None:
+            label1 = label1 + "(" + self.description + ")"
+            
+        label2 = ("T" + str(other.time) + "iz" + str(iz))
+        if self.description is not None:
+            label2 = label2 + "(" + other.description + ")"
+            
+            
+        label = label2 + " - " + label1
+        
+        
+        y = other.values[field][:,iz] - self.values[field][:,iz] 
+        y0 = np.zeros_like(y)
+        x = self.grids[0].points
+        
+        
+        plt.plot(x, y, label=label)
+        plt.plot(x, y0,label="zeros")
+        
+        return y
         
     
 

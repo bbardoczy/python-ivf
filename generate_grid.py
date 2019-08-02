@@ -18,7 +18,7 @@ from rw_approximations import rouw_st, rouw_nonst
 from mc_tools import trim_matrix, combine_matrices_dependent, combine_matrices_list
 
 
-def generate_GS_matrix(sigma_g=0.05,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,fun = lambda g : np.maximum(g,0)):
+def generate_GS_matrix(sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,fun = lambda g : np.maximum(g,0)):
     # this generates joint transition matrix for carreer growth rate g and
     # skill level s. fun specifies how g maps into changes in s.
     
@@ -68,7 +68,7 @@ def generate_Z_matrices(sigma_z_init=0.15,sigma_z=0.1,nz=10,T=40):
 
 
 def generate_zgs(sigma_z_init=0.15,sigma_z=0.1,nz=10,T=40,
-                 sigma_g=0.05,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,
+                 sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,
                  fun = lambda g : np.maximum(g,0)):
     
     gsgrid, mat = generate_GS_matrix(sigma_g,rho_g,ng,smin,smax,ns,fun)    
