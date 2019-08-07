@@ -174,7 +174,7 @@ def define_u(sigma,u_kid_c,u_kid_add):
 if __name__ == "__main__":
     
     
-    T = 20
+    T = 5
     sigma = 1
     R = 1.03
     beta = 0.97
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     phi_out = 0.4
     pback = 0.25
     
-    eps = 0.0
+    eps = 0.01
     
     zgs_GridList, zgs_MatList = list(), list()
     
@@ -220,19 +220,20 @@ if __name__ == "__main__":
     
     ue = [uenv.create(u[0],False), uenv.create(u[1],False), uenv.create(u[2],False)]
         
-    V = {'No children':list(), 'One child, out':list(), 'One child, in':list()}
+    
+    V = {'No children':[None]*T, 'One child, out':[None]*T, 'One child, in':[None]*T}
     
     descriptions = [*V] 
     
-    for igrid in [0,1,2]:
+    for igrid in range(len(descriptions)):
         
         desc = descriptions[igrid]
         Vcs = iterator(agrid,labor_income[igrid](zgs_GridList[igrid][-1],T-1),None,None,None,R,beta,u=u[igrid],mu=mu[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])  
         #V, c, s = [Vlast], [clast], [slast]
-        V[desc].append(vpack(Vcs,agrid,zgs_GridList[igrid][-1],T-1,desc))
+        V[desc][T-1] = vpack(Vcs,agrid,zgs_GridList[igrid][-1],T-1,desc)
         
     for t in reversed(range(T-1)):
-        for igrid in [0,1,2]:            
+        for igrid in range(len(descriptions)):            
             
             desc = descriptions[igrid]
             
@@ -240,24 +241,24 @@ if __name__ == "__main__":
             ma  = zgs_MatList[igrid][t]
             
             if desc == "One child, in":
-                EV = np.dot( V["One child, in"][0]['V'],  ma.T)
-                cnext = V["One child, in"][0]['c']
+                EV = np.dot( V["One child, in"][t+1]['V'],  ma.T)
+                cnext = V["One child, in"][t+1]['c']
             if desc == "One child, out":
-                EV = np.dot( pback*V["One child, in"][0]['V'] + (1-pback)*V["One child, out"][0]['V'],  ma.T)
-                c0 = V["One child, out"][0]['c']
-                c1 = V["One child, in"][0]['c']
+                EV = np.dot( pback*V["One child, in"][t+1]['V'] + (1-pback)*V["One child, out"][t+1]['V'],  ma.T)
+                c0 = V["One child, out"][t+1]['c']
+                c1 = V["One child, in"][t+1]['c']
                 p0 = 1 - pback                
                 cnext = (c0,c1,p0)
             else:                
-                EV = np.dot( smooth_max(V["No children"][0]['V'],V["One child, out"][0]['V'],eps), ma.T)
-                c0 = V["No children"][0]['c']
-                c1 = V["One child, out"][0]['c']
-                p0 = smooth_p0(V["No children"][0]['V'],V["One child, out"][0]['V'],eps)
+                EV = np.dot( smooth_max(V["No children"][t+1]['V'],V["One child, out"][t+1]['V'],eps), ma.T)
+                c0 = V["No children"][t+1]['c']
+                c1 = V["One child, out"][t+1]['c']
+                p0 = smooth_p0(V["No children"][t+1]['V'],V["One child, out"][t+1]['V'],eps)
                 cnext = (c0,c1,p0)
             
             Vcs = iterator(agrid,labor_income[igrid](gri,t),EV,cnext,ma,R,beta,u=u[igrid],mu=mu[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])
            
-            V[desc] = [vpack(Vcs,agrid,gri,t,desc)] + V[desc]
+            V[desc][t] = vpack(Vcs,agrid,gri,t,desc)
         
         
     it = 0
@@ -269,10 +270,10 @@ if __name__ == "__main__":
     
     plt.cla()
     #plt.subplot(211)
-    V[  "No children"  ][it].plot_value( ['s',['s','c',np.add],np.divide] )
-    V[  "One child, in"][it].plot_value( ['s',['s','c',np.add],np.divide] )
+    #V[  "No children"  ][it].plot_value( ['s',['s','c',np.add],np.divide] )
+    #V[  "One child, in"][it].plot_value( ['s',['s','c',np.add],np.divide] )
     #plt.subplot(212)
-    #V["No children"][it].plot_diff(V["One child"][it],['s',['s','c',np.add],np.divide])
+    V["No children"][it].plot_diff(V["One child, in"][it],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
     plt.legend()
         
     
