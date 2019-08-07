@@ -90,6 +90,18 @@ class valuefunction(gridval):
     def __getitem__(self, key):
         if isinstance(key,str):
             return gridval.__getitem__(self, key)
+        
+        elif isinstance(key,list):
+            
+            assert isinstance(key[0],(str,list))
+            assert isinstance(key[1],(str,list))
+            assert callable(key[2])
+            
+            v0 = self[key[0]]
+            v1 = self[key[1]]
+            
+            return key[2](v0,v1)
+        
         else: # treat this as if we ask about V
             return self.values['V'][key]
             
@@ -111,7 +123,7 @@ class valuefunction(gridval):
         if self.description is not None:
             label = label + ", " + self.description
             
-        y = self.values[field][:,iz]
+        y = self[field][:,iz]
         x = self.grids[0].points
         
         
@@ -119,7 +131,10 @@ class valuefunction(gridval):
         
         return y    
     
-    def plot_diff(self,other,field,iz=None):
+    
+    
+    
+    def plot_diff(self,other,field,iz=None,between="-",operation=np.subtract):
         import matplotlib.pyplot as plt
         
         if iz is None:
@@ -134,10 +149,12 @@ class valuefunction(gridval):
             label2 = label2 + "(" + other.description + ")"
             
             
-        label = label2 + " - " + label1
+        label = label2 + between + label1
         
+        y_other = other[field][:,iz]
+        y_self = self[field][:,iz]
         
-        y = other.values[field][:,iz] - self.values[field][:,iz] 
+        y = operation(y_other,y_self)
         y0 = np.zeros_like(y)
         x = self.grids[0].points
         
@@ -146,6 +163,8 @@ class valuefunction(gridval):
         plt.plot(x, y0,label="zeros")
         
         return y
+    
+    
         
     
 

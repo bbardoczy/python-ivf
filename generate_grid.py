@@ -15,12 +15,13 @@ The last function generate_zgs is aimed to be used externally
 import numpy as np
 from trans_unif import transition_uniform
 from rw_approximations import rouw_st, rouw_nonst
-from mc_tools import trim_matrix, combine_matrices_dependent, combine_matrices_list
+from mc_tools import trim_matrix, combine_matrices_dependent, combine_matrices_list, combine_matrices_two_lists
 
 
-def generate_GS_matrix(sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,fun = lambda g : np.maximum(g,0)):
+def generate_GS_matrix(sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,fun = lambda g : np.maximum(g,0),mult_i=1.0):
     # this generates joint transition matrix for carreer growth rate g and
-    # skill level s. fun specifies how g maps into changes in s.
+    # skill level s. fun specifies how g maps into changes in s. mult_i is an
+    # additional multiplier
     
     trim_level = 0.001
     # approximate g
@@ -33,7 +34,7 @@ def generate_GS_matrix(sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,fun = 
     # define S transition matrix for each g
     Slist = list()
     for ig in range(G.size):
-        snext = sgrid + fun(G[ig])
+        snext = sgrid + mult_i*fun(G[ig])
     
         T = np.zeros((sgrid.size,sgrid.size))
         j_to, p_to = transition_uniform(sgrid,snext)
@@ -56,6 +57,18 @@ def generate_GS_matrix(sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,fun = 
     return GSgrid, GSMat
 
 
+def generate_GS_matrices(sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,fun = lambda g : np.maximum(g,0),mult=None):
+    if mult is None:
+        gs, mat = generate_GS_matrix(sigma_g,rho_g,ng,smin,smax,ns,fun,mult_i=1.0)
+    else:
+        gs, mat = list(), list()
+        for t in range(mult.size):
+            gs_i, mat_i = generate_GS_matrix(sigma_g,rho_g,ng,smin,smax,ns,fun,mult_i=mult[t])
+            gs = gs + [gs_i]
+            mat = mat + [mat_i]        
+    return gs, mat
+        
+
 def generate_Z_matrices(sigma_z_init=0.15,sigma_z=0.1,nz=10,T=40):
     trim_level = 0.001
     # this generates transition matrices for z
@@ -69,12 +82,16 @@ def generate_Z_matrices(sigma_z_init=0.15,sigma_z=0.1,nz=10,T=40):
 
 def generate_zgs(sigma_z_init=0.15,sigma_z=0.1,nz=10,T=40,
                  sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,
-                 fun = lambda g : np.maximum(g,0)):
+                 fun = lambda g : np.maximum(g,0), mult=None):
     
-    gsgrid, mat = generate_GS_matrix(sigma_g,rho_g,ng,smin,smax,ns,fun)    
+    
     zval, zMat = generate_Z_matrices(sigma_z_init,sigma_z,nz,T)
     
-    
-    zgs_GridList, zgs_MatList = combine_matrices_list(zval,gsgrid,zMat,mat,trim=False)
+    if mult is None:
+        gsgrid, mat = generate_GS_matrix(sigma_g,rho_g,ng,smin,smax,ns,fun) 
+        zgs_GridList, zgs_MatList = combine_matrices_list(zval,gsgrid,zMat,mat,trim=False)
+    else:
+        gslist, matlist = generate_GS_matrices(sigma_g,rho_g,ng,smin,smax,ns,fun,mult)
+        zgs_GridList, zgs_MatList = combine_matrices_two_lists(zval,gslist,zMat,matlist,trim=False)
     
     return zgs_GridList, zgs_MatList

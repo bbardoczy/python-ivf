@@ -83,7 +83,7 @@ def combine_matrices_list(alist,b,Pialist,Pib,check=True,trim=True,trim_level=0.
     # this combines each element of Pialist and Pib
     # they assumed to be independent (i.e. Pialist and Pib can be combined in any order)
     grid, Pi = (list(), list())
-    
+        
     
     for i in range(0,len(Pialist)):
         gr_a, Pi_a = combine_matrices(alist[i],b,Pialist[i],Pib,check,trim,trim_level)
@@ -92,6 +92,26 @@ def combine_matrices_list(alist,b,Pialist,Pib,check=True,trim=True,trim_level=0.
         
     if len(alist) > len(Pialist): # fix in case alist has one more element
         grid = grid + [mat_combine(alist[-1],b)]
+        
+    return grid, Pi
+
+
+@jit
+def combine_matrices_two_lists(alist,blist,Pialist,Piblist,check=True,trim=True,trim_level=0.001):
+    # this combines each element of Pialist and Pib
+    # they assumed to be independent (i.e. Pialist and Pib can be combined in any order)
+    grid, Pi = (list(), list())
+        
+    assert len(alist) == len(blist)
+    
+    
+    for i in range(0,len(Pialist)):
+        gr_a, Pi_a = combine_matrices(alist[i],blist[i],Pialist[i],Piblist[i],check,trim,trim_level)
+        grid = grid + [gr_a]
+        Pi   = Pi + [Pi_a]
+        
+    if len(alist) > len(Pialist): # fix in case alist has one more element
+        grid = grid + [mat_combine(alist[-1],blist[-1])]
         
     return grid, Pi
         
