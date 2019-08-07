@@ -129,7 +129,7 @@ class valuefunction(gridval):
         
         plt.plot(x, y, label=label)
         
-        return y    
+        #return y    
     
     
     
@@ -162,7 +162,7 @@ class valuefunction(gridval):
         plt.plot(x, y, label=label)
         plt.plot(x, y0,label="zeros")
         
-        return y
+        #return y
     
     
         

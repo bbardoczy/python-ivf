@@ -84,8 +84,9 @@ def Vnext_egm(agrid,labor_income,EV_next,c_next,Pi,R,beta,m=None,u=None,mu=None,
             if not np.all(np.diff(m_of_anext[:,i])>0):
                 
                 assert dc, "Non-monotonic m with no switching?"
+                assert type(p0) is np.ndarray, "p0 is fixed!"
                 
-                uecount+= 1
+                uecount += 1
                 # use upper envelope routine
                 (c_i, V_i) = (np.empty_like(m_of_anext[:,i]), np.empty_like(m_of_anext[:,i]))
                 uefun(agrid,m_of_anext[:,i],c_of_anext[:,i],EV_next[:,i],m[:,i],c_i,V_i)
@@ -161,9 +162,9 @@ def define_u(sigma,u_kid_c,u_kid_add):
             return factor*(x**(1-sigma))/(1-sigma) + u_kid_add
         
     
-    u =      [u_nok,  u_k]
-    mu =     [lambda x  : (x**(-sigma)),             lambda x  : factor*(x**(-sigma))]
-    mu_inv = [lambda MU : (MU**(-1/sigma)),          lambda MU : ((MU/factor)**(-1/sigma))]
+    u =      [u_nok,  u_k, u_k]
+    mu =     [lambda x  : (x**(-sigma)),             lambda x  : factor*(x**(-sigma)),      lambda x  : factor*(x**(-sigma))]
+    mu_inv = [lambda MU : (MU**(-1/sigma)),          lambda MU : ((MU/factor)**(-1/sigma)), lambda MU : ((MU/factor)**(-1/sigma))]
         
     return u, mu, mu_inv
 
@@ -173,7 +174,7 @@ def define_u(sigma,u_kid_c,u_kid_add):
 if __name__ == "__main__":
     
     
-    T = 5
+    T = 20
     sigma = 1
     R = 1.03
     beta = 0.97
@@ -181,7 +182,7 @@ if __name__ == "__main__":
     trange = np.arange(0,T)
     trange = trange/np.mean(trange)
     
-    a0, a1, a2 = 0.5, 0.2, 0.6
+    a0, a1, a2 = 0.0, 0.05, 0.05
     ztrend = a0 + a1*trange + a2*(trange**2)
     b0 = 0
     b1 = 0
@@ -194,9 +195,11 @@ if __name__ == "__main__":
     z_kid = 0.2
     u_kid_c = 0.0
     u_kid_add = 0.05
-    phi_kid = 1
+    phi_in = 1
+    phi_out = 0.4
+    pback = 0.25
     
-    eps = 0.005
+    eps = 0.0
     
     zgs_GridList, zgs_MatList = list(), list()
     
@@ -206,64 +209,70 @@ if __name__ == "__main__":
     zgs_GridList_nok,   zgs_MatList_nok  = generate_zgs(**a)
     zgs_GridList_k,     zgs_MatList_k  = generate_zgs(**a,fun = lambda g : np.maximum( g - g_kid, 0 ) )
     
-    zgs_GridList = [ zgs_GridList_nok,  zgs_GridList_k ]
-    zgs_MatList  = [ zgs_MatList_nok ,  zgs_MatList_k  ]
+    zgs_GridList = [ zgs_GridList_nok,  zgs_GridList_k, zgs_GridList_k ]
+    zgs_MatList  = [ zgs_MatList_nok ,  zgs_MatList_k,  zgs_MatList_k  ]
     
     iterator = Vnext_egm
     
-    labor_income = [lambda grid, t : np.exp(grid[:,0] + grid[:,2] + ztrend[t]).T, lambda grid, t : phi_kid*np.exp(grid[:,0] + grid[:,2] - z_kid  + ztrend[t]).T]
+    labor_income = [lambda grid, t : np.exp(grid[:,0] + grid[:,2] + ztrend[t]).T, lambda grid, t : phi_out*np.exp(grid[:,0] + grid[:,2] - z_kid  + ztrend[t]).T, lambda grid, t : phi_in*np.exp(grid[:,0] + grid[:,2] - z_kid  + ztrend[t]).T]
     
     u, mu, mu_inv = define_u(sigma,u_kid_c,u_kid_add)
     
-    ue = [uenv.create(u[0],False), uenv.create(u[1],False)]
+    ue = [uenv.create(u[0],False), uenv.create(u[1],False), uenv.create(u[2],False)]
         
-    V = list()
+    V = {'No children':list(), 'One child, out':list(), 'One child, in':list()}
     
+    descriptions = [*V] 
     
-    
-    
-    desc = ["No children","One child"]
-    
-    for igrid in [0,1]:
+    for igrid in [0,1,2]:
         
+        desc = descriptions[igrid]
         Vcs = iterator(agrid,labor_income[igrid](zgs_GridList[igrid][-1],T-1),None,None,None,R,beta,u=u[igrid],mu=mu[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])  
         #V, c, s = [Vlast], [clast], [slast]
-        V.append([vpack(Vcs,agrid,zgs_GridList[igrid][-1],T-1,desc[igrid])])
+        V[desc].append(vpack(Vcs,agrid,zgs_GridList[igrid][-1],T-1,desc))
         
     for t in reversed(range(T-1)):
-        for igrid in [0,1]:            
+        for igrid in [0,1,2]:            
             
+            desc = descriptions[igrid]
             
             gri = zgs_GridList[igrid][t]
             ma  = zgs_MatList[igrid][t]
             
-            if igrid == 1:
-                EV = np.dot( V[igrid][0]['V'],  ma.T)
-                cnext = V[igrid][0]['c']
+            if desc == "One child, in":
+                EV = np.dot( V["One child, in"][0]['V'],  ma.T)
+                cnext = V["One child, in"][0]['c']
+            if desc == "One child, out":
+                EV = np.dot( pback*V["One child, in"][0]['V'] + (1-pback)*V["One child, out"][0]['V'],  ma.T)
+                c0 = V["One child, out"][0]['c']
+                c1 = V["One child, in"][0]['c']
+                p0 = 1 - pback                
+                cnext = (c0,c1,p0)
             else:                
-                EV = np.dot( smooth_max(V[0][0]['V'],V[1][0]['V'],eps), ma.T)
-                c0 = V[0][0]['c']
-                c1 = V[1][0]['c']
-                p0 = smooth_p0(V[0][0]['V'],V[1][0]['V'],eps)
+                EV = np.dot( smooth_max(V["No children"][0]['V'],V["One child, out"][0]['V'],eps), ma.T)
+                c0 = V["No children"][0]['c']
+                c1 = V["One child, out"][0]['c']
+                p0 = smooth_p0(V["No children"][0]['V'],V["One child, out"][0]['V'],eps)
                 cnext = (c0,c1,p0)
             
             Vcs = iterator(agrid,labor_income[igrid](gri,t),EV,cnext,ma,R,beta,u=u[igrid],mu=mu[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])
            
-            V[igrid] = [vpack(Vcs,agrid,gri,t,desc[igrid])] + V[igrid]
+            V[desc] = [vpack(Vcs,agrid,gri,t,desc)] + V[desc]
         
         
-    it = -4
+    it = 0
     
-    print(V[0][0][5,1000])
-    print(V[1][0][5,1000]-V[0][0][5,1000])
+    print(V["No children"][it][5,1000])
+    print(V["One child, in"][it][5,1000]-V["No children"][it][5,1000])
+    print(V["One child, out"][it][5,1000]-V["No children"][it][5,1000])
     
     
     plt.cla()
     #plt.subplot(211)
-    #V[0][it].plot_value(['s',['s','c',np.add],np.divide])
-    #V[1][it].plot_value(['s',['s','c',np.add],np.divide])
+    V[  "No children"  ][it].plot_value( ['s',['s','c',np.add],np.divide] )
+    V[  "One child, in"][it].plot_value( ['s',['s','c',np.add],np.divide] )
     #plt.subplot(212)
-    V[0][it].plot_diff(V[1][it],['s',['s','c',np.add],np.divide])
+    #V["No children"][it].plot_diff(V["One child"][it],['s',['s','c',np.add],np.divide])
     plt.legend()
         
     
