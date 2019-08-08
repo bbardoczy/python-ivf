@@ -174,7 +174,7 @@ def define_u(sigma,u_kid_c,u_kid_add):
 if __name__ == "__main__":
     
     
-    T = 5
+    T = 20
     sigma = 1
     R = 1.03
     beta = 0.97
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     a0, a1, a2 = 0.0, 0.05, 0.05
     ztrend = a0 + a1*trange + a2*(trange**2)
     b0 = 0
-    b1 = 0
+    b1 = -0.1
     gtrend = np.exp(b0 + b1*trange)
     
     
@@ -199,12 +199,10 @@ if __name__ == "__main__":
     phi_out = 0.4
     pback = 0.25
     
-    eps = 0.01
+    eps = 0.000
     
-    zgs_GridList, zgs_MatList = list(), list()
-    
-    a = dict(sigma_z_init=0.15,sigma_z=0.1,nz=10,
-                 sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,T=T,mult=gtrend)
+    a = dict(sigma_z_init=0.15,sigma_z=0.1,nz=7,
+                 sigma_g=0.1,rho_g=0.8,ng=7,smin=0,smax=4.12,ns=16,T=T,mult=gtrend)
     
     zgs_GridList_nok,   zgs_MatList_nok  = generate_zgs(**a)
     zgs_GridList_k,     zgs_MatList_k  = generate_zgs(**a,fun = lambda g : np.maximum( g - g_kid, 0 ) )
@@ -269,10 +267,10 @@ if __name__ == "__main__":
     
     
     plt.cla()
-    #plt.subplot(211)
-    #V[  "No children"  ][it].plot_value( ['s',['s','c',np.add],np.divide] )
-    #V[  "One child, in"][it].plot_value( ['s',['s','c',np.add],np.divide] )
-    #plt.subplot(212)
+    plt.subplot(211)
+    V[  "No children"  ][it].plot_value( ['s',['s','c',np.add],np.divide] )
+    V[  "One child, in"][it].plot_value( ['s',['s','c',np.add],np.divide] )
+    plt.subplot(212)
     V["No children"][it].plot_diff(V["One child, in"][it],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
     plt.legend()
         
