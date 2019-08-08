@@ -34,20 +34,14 @@ def vfint(vfin,Pi):
 
 
 
-def Vnext_egm(agrid,labor_income,EV_next,c_next,Pi,R,beta,m=None,u=None,mu=None,mu_inv=None,uefun=None):
+def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv=None,uefun=None):
     
     
     if m is None: # we can override m
         m = np.float64( R*agrid[:,np.newaxis] + labor_income )
         
     
-    if type(c_next) is tuple:
-        dc = True
-        c0 = c_next[0]
-        c1 = c_next[1]
-        p0 = c_next[2]
-    else:
-        dc = False
+    dc = True
         
         
     
@@ -55,30 +49,17 @@ def Vnext_egm(agrid,labor_income,EV_next,c_next,Pi,R,beta,m=None,u=None,mu=None,
         V, c, s = (u(m), m, np.zeros_like(m))
     else:
         
-        if dc:
-            mu_next = p0*mu(c0) + (1-p0)*mu(c1)
-        else:
-            mu_next = mu(c_next)
         
-        muc = beta*R*np.dot(mu_next,Pi.T)
         
-        c_of_anext = mu_inv( np.maximum(muc,1e-16) )
+        c_of_anext = mu_inv( np.maximum(EMU_next,1e-16) )
         m_of_anext = c_of_anext + agrid[:,np.newaxis]
-        #v_of_anext = u(c_of_anext) + EV_next
-        
-        
-        #assert np.all(m_of_anext >= np.min(m,axis=0)), 'fix at 0 is needed'
-        # uefun fixes things at 0 manually
-        # otherwise in the else block np.maximum does the job
-        
-        
-           
         
         c = np.empty_like(m)
         s = np.empty_like(m)
         V = np.empty_like(m)
         
         uecount = 0
+        
         for i in range(m_of_anext.shape[1]):
             
             if not np.all(np.diff(m_of_anext[:,i])>0):
@@ -169,6 +150,24 @@ def define_u(sigma,u_kid_c,u_kid_add):
     return u, mu, mu_inv
 
 
+"""
+class state:
+    def __init__(self,name,time,grid,Pi,LI,U):
+        self.name = name
+        self.transitions = [self]
+        self.endo_transition = False
+        self.p_transition    = [1.0]
+        self.time = time
+        self.grid = grid
+        self.Pi = Pi
+        self.LI = LI
+        self.U  = U
+"""     
+    
+            
+
+           
+
 
 # this runs the file    
 if __name__ == "__main__":
@@ -178,6 +177,7 @@ if __name__ == "__main__":
     sigma = 1
     R = 1.03
     beta = 0.97
+    
     
     trange = np.arange(0,T)
     trange = trange/np.mean(trange)
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     for igrid in range(len(descriptions)):
         
         desc = descriptions[igrid]
-        Vcs = iterator(agrid,labor_income[igrid](zgs_GridList[igrid][-1],T-1),None,None,None,R,beta,u=u[igrid],mu=mu[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])  
+        Vcs = iterator(agrid,labor_income[igrid](zgs_GridList[igrid][-1],T-1),None,None,None,R,beta,u=u[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])  
         #V, c, s = [Vlast], [clast], [slast]
         V[desc][T-1] = vpack(Vcs,agrid,zgs_GridList[igrid][-1],T-1,desc)
         
@@ -238,23 +238,30 @@ if __name__ == "__main__":
             gri = zgs_GridList[igrid][t]
             ma  = zgs_MatList[igrid][t]
             
-            if desc == "One child, in":
-                EV = np.dot( V["One child, in"][t+1]['V'],  ma.T)
-                cnext = V["One child, in"][t+1]['c']
-            if desc == "One child, out":
-                EV = np.dot( pback*V["One child, in"][t+1]['V'] + (1-pback)*V["One child, out"][t+1]['V'],  ma.T)
-                c0 = V["One child, out"][t+1]['c']
-                c1 = V["One child, in"][t+1]['c']
-                p0 = 1 - pback                
-                cnext = (c0,c1,p0)
-            else:                
-                EV = np.dot( smooth_max(V["No children"][t+1]['V'],V["One child, out"][t+1]['V'],eps), ma.T)
-                c0 = V["No children"][t+1]['c']
-                c1 = V["One child, out"][t+1]['c']
-                p0 = smooth_p0(V["No children"][t+1]['V'],V["One child, out"][t+1]['V'],eps)
-                cnext = (c0,c1,p0)
+            def integrate(V):
+                return np.dot(V,ma.T)
             
-            Vcs = iterator(agrid,labor_income[igrid](gri,t),EV,cnext,ma,R,beta,u=u[igrid],mu=mu[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])
+            if desc == "One child, in":
+                Vcomb =  V["One child, in"][t+1]['V']
+                MU_comb = mu[igrid](V["One child, in"][t+1]['c'])
+                
+            if desc == "One child, out":
+                
+                Vcomb = V["One child, out"][t+1].combine( V["One child, in"][t+1], ps=pback, field = 'V' )
+                MU_comb = V["One child, out"][t+1].combine( V["One child, in"][t+1], ps=pback, field = 'c',fun = mu[igrid])                
+               
+            else:                
+                Vcomb =  V["No children"][t+1].combine( V["One child, out"][t+1], eps=eps )
+                p0 = 1.0 - smooth_p0(V["No children"][t+1]['V'],V["One child, out"][t+1]['V'],eps)
+                MU_comb = V["No children"][t+1].combine( V["One child, out"][t+1], ps=p0, field='c', fun = mu[igrid])
+                
+            
+            assert np.all(MU_comb > 0)
+            
+            EV  = integrate(Vcomb)
+            EMU = integrate(MU_comb)
+            
+            Vcs = iterator(agrid,labor_income[igrid](gri,t),EV,EMU,ma,R,beta,u=u[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])
            
             V[desc][t] = vpack(Vcs,agrid,gri,t,desc)
         

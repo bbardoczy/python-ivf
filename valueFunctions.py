@@ -104,10 +104,13 @@ class valuefunction(gridval):
         
         else: # treat this as if we ask about V
             return self.values['V'][key]
+    
             
     
     def integrate(self,integrator,*args):
         return integrator(self,*args)
+    
+    
     
     
     def plot_value(self,field, iz = None):
@@ -165,6 +168,82 @@ class valuefunction(gridval):
         #return y
     
     
+    def combine(self,vlist=None,ps=None,eps=None,field='V', fun = lambda x : x):
+        # combines multiple value functions
+        # if plist is supplied 
+        # ps contains probabilities or eps contains taste shocks standard deviations
+        
+        assert (ps is None) or (eps is None)
+        
+        if vlist is None:
+            return self[field]
+        
+        
+        if not isinstance(vlist,list):
+            vlist = [vlist]
+            
+        v_in = [fun(self[field])] + [ fun(i[field]) if type(i) is valuefunction else fun(i) for i in vlist ]
+            
+            
+        if ps is not None:
+            # exogenous combination
+            if (not isinstance(ps,list)):
+                ps = [ps]
+            return self.combine_exo(v_in,ps)
+        else:
+            return self.combine_endo(v_in,eps)
         
     
+    def combineV(self,*args,**kwargs):
+        val = self.combine(*args,**kwargs)
+        return valuefunction(self.grids,{'V':val},self.time,description='EV')
+            
+    
+            
+       
+    @staticmethod    
+    def combine_endo(vlist,eps):
+        vmax = np.maximum(*vlist)
+        
+        
+        if eps > 1e-6:
+            S = 0.0
+            for v in vlist:
+                S += np.exp((v - vmax)/eps)
+                
+            assert np.all(S >= 1.0)
+            
+            return vmax + eps*np.log(S)
+        else:
+            return vmax
+    
+    @staticmethod
+    def combine_exo(vlist,plist_wo_0):
+        
+        if type(plist_wo_0[0]) is np.ndarray:
+            Psum = np.zeros_like(plist_wo_0[0])
+            
+            for i in range(len(plist_wo_0)):
+                Psum += plist_wo_0[i]
+        else:
+            Psum = np.sum(plist_wo_0)
+                
+        
+        p0 = 1-Psum
+        
+        assert np.all(p0 >= 0) and np.all(p0 <= 1)
+        plist = [p0] + plist_wo_0
+        
+        assert len(vlist) == len(plist)
+        
+        S = 0.0
+        for i in range(len(vlist)):
+            S += plist[i]*vlist[i]
+        
+        return S
+        
+        
+        
+            
+            
 
