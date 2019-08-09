@@ -65,7 +65,6 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
             if not np.all(np.diff(m_of_anext[:,i])>0):
                 
                 assert dc, "Non-monotonic m with no switching?"
-                assert type(p0) is np.ndarray, "p0 is fixed!"
                 
                 uecount += 1
                 # use upper envelope routine
@@ -199,7 +198,7 @@ if __name__ == "__main__":
     phi_out = 0.4
     pback = 0.25
     
-    eps = 0.000
+    eps = 0.01
     
     a = dict(sigma_z_init=0.15,sigma_z=0.1,nz=7,
                  sigma_g=0.1,rho_g=0.8,ng=7,smin=0,smax=4.12,ns=16,T=T,mult=gtrend)
@@ -250,12 +249,15 @@ if __name__ == "__main__":
                 Vcomb = V["One child, out"][t+1].combine( V["One child, in"][t+1], ps=pback, field = 'V' )
                 MU_comb = V["One child, out"][t+1].combine( V["One child, in"][t+1], ps=pback, field = 'c',fun = mu[igrid])                
                
-            else:                
-                Vcomb =  V["No children"][t+1].combine( V["One child, out"][t+1], eps=eps )
-                p0 = 1.0 - smooth_p0(V["No children"][t+1]['V'],V["One child, out"][t+1]['V'],eps)
-                MU_comb = V["No children"][t+1].combine( V["One child, out"][t+1], ps=p0, field='c', fun = mu[igrid])
+            else:       
                 
-            
+                Vcomb, p =  V["No children"][t+1].combine( V["One child, out"][t+1], eps=eps, return_p = True)
+                
+                psw = 1.0 - smooth_p0(V["No children"][t+1]['V'],V["One child, out"][t+1]['V'],eps)
+                MU_comb = V["No children"][t+1].combine( V["One child, out"][t+1], ps=psw, field='c', fun = mu[igrid])
+                
+                assert np.all(np.abs(p[1] - psw)<1e-6)
+                
             assert np.all(MU_comb > 0)
             
             EV  = integrate(Vcomb)

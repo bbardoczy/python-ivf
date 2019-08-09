@@ -168,7 +168,7 @@ class valuefunction(gridval):
         #return y
     
     
-    def combine(self,vlist=None,ps=None,eps=None,field='V', fun = lambda x : x):
+    def combine(self,vlist=None,ps=None,eps=None,field='V', fun = lambda x : x, return_p = False):
         # combines multiple value functions
         # if plist is supplied 
         # ps contains probabilities or eps contains taste shocks standard deviations
@@ -191,7 +191,7 @@ class valuefunction(gridval):
                 ps = [ps]
             return self.combine_exo(v_in,ps)
         else:
-            return self.combine_endo(v_in,eps)
+            return self.combine_endo(v_in,eps,return_p = return_p)
         
     
     def combineV(self,*args,**kwargs):
@@ -202,20 +202,44 @@ class valuefunction(gridval):
             
        
     @staticmethod    
-    def combine_endo(vlist,eps):
+    def combine_endo(vlist,eps,return_p=False):
         vmax = np.maximum(*vlist)
         
         
+        p = [None]*len(vlist)
+        
         if eps > 1e-6:
             S = 0.0
-            for v in vlist:
-                S += np.exp((v - vmax)/eps)
-                
+            
+            for i in range(len(vlist)):
+                p[i] = np.exp((vlist[i] - vmax)/eps)
+                S += p[i]
+            
+            p = [j/S for j in p]
+            print('yes')
             assert np.all(S >= 1.0)
             
-            return vmax + eps*np.log(S)
         else:
-            return vmax
+            S = 1.0 # does not matter
+            
+            
+            for i in range(len(vlist)):
+                p[i] = np.float64(vlist[i]==vmax)
+                
+                
+        # test
+        if len(vlist)==2:
+            v0 = vmax + eps*np.log(S) - eps*np.log(len(vlist)) 
+            from vf_tools import smooth_max
+            assert np.all(np.abs(v0 - smooth_max(vlist[0],vlist[1],eps))<1e-6)
+                
+        if not return_p:
+            return vmax + eps*np.log(S) - eps*np.log(len(vlist))
+        else:
+            return vmax + eps*np.log(S) - eps*np.log(len(vlist)), p
+    
+    
+    
     
     @staticmethod
     def combine_exo(vlist,plist_wo_0):
