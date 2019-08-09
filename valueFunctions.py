@@ -176,7 +176,7 @@ class valuefunction(gridval):
         assert (ps is None) or (eps is None)
         
         if vlist is None:
-            return self[field]
+            return fun(self[field])
         
         
         if not isinstance(vlist,list):
@@ -216,28 +216,27 @@ class valuefunction(gridval):
                 S += p[i]
             
             p = [j/S for j in p]
-            print('yes')
             assert np.all(S >= 1.0)
             
         else:
-            S = 1.0 # does not matter
-            
+            S = 1.0 # does not matter            
             
             for i in range(len(vlist)):
                 p[i] = np.float64(vlist[i]==vmax)
                 
-                
+        """    
         # test
         if len(vlist)==2:
             v0 = vmax + eps*np.log(S) - eps*np.log(len(vlist)) 
             from vf_tools import smooth_max
             assert np.all(np.abs(v0 - smooth_max(vlist[0],vlist[1],eps))<1e-6)
-                
+        """
+        
         if not return_p:
             return vmax + eps*np.log(S) - eps*np.log(len(vlist))
         else:
             return vmax + eps*np.log(S) - eps*np.log(len(vlist)), p
-    
+        
     
     
     
