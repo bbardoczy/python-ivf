@@ -17,6 +17,7 @@ import numpy as np
 from vf_tools import smooth_max, smooth_p0
 import uenv
 from numba import njit
+from valueFunctions import valuefunction, grid_dim_linear, grid_dim_discrete
 
 
 
@@ -114,7 +115,6 @@ def Vnext_vfi(agrid,labor_income,EV_next,c_next,Pi,R,beta,m=None,u=None,mu=None,
 
 
 def vpack(Vcs,agrid,zgsgrid,time,description=""):
-    from valueFunctions import valuefunction, grid_dim_linear, grid_dim_discrete
     
     Vout = valuefunction([grid_dim_linear(agrid),grid_dim_discrete(zgsgrid)],{'V':Vcs[0],'c':Vcs[1],'s':Vcs[2]},time,description)
     return Vout
@@ -149,23 +149,51 @@ def define_u(sigma,u_kid_c,u_kid_add):
     return u, mu, mu_inv
 
 
-"""
-class state:
-    def __init__(self,name,time,grid,Pi,LI,U):
-        self.name = name
-        self.transitions = [self]
-        self.endo_transition = False
-        self.p_transition    = [1.0]
-        self.time = time
-        self.grid = grid
-        self.Pi = Pi
-        self.LI = LI
-        self.U  = U
-"""     
+def v0(obj):
     
+    o = obj.options    
+    while not isinstance(o[0],str):
+        o = o[0].options
+    
+    assert type(o[0]) is str
+    
+    return o[0]
+
+
+class choice:
+    def __init__(self,options,eps):
+        self.options = options
+        self.eps = eps        
+        self.v0 = v0(self)
+        
+        assert isinstance(options,list), 'Choices must be a list!'
+        assert all([isinstance(i,(choice,shock,str)) for i in options]), 'Unsupported thing in choices!'
+        
+        
+        
+class shock:
+    def __init__(self,options,ps):
+        self.options = options
+        self.ps      = ps        
+        self.v0 = v0(self)
+        
+        assert np.abs(sum(ps) - 1)<1e-6
+        assert isinstance(options,list), 'Options must be a list!'
+        assert all([isinstance(i,(choice,shock,str)) for i in options]), 'Unsupported thing in options!'
+        
             
 
-           
+class transition:
+    def __init__(self,to,Vnext):
+        assert (isinstance(to,(choice,shock,str)))
+        
+        self.Vnext = Vnext
+        
+        if isinstance(to,str):
+            self.Vown = Vnext[to]
+        else:
+            self.Vown = Vnext[to.v0]
+                
 
 
 # this runs the file    
@@ -218,18 +246,24 @@ if __name__ == "__main__":
     ue = [uenv.create(u[0],False), uenv.create(u[1],False), uenv.create(u[2],False)]
         
     
-    V = {'No children':[None]*T, 'One child, out':[None]*T, 'One child, in':[None]*T}
+    V = [{ 'No children':None, 'One child, out':None, 'One child, in':None }]*T
     
-    descriptions = [*V] 
+    descriptions = [*V[0]] 
     
     for igrid in range(len(descriptions)):
         
         desc = descriptions[igrid]
         Vcs = iterator(agrid,labor_income[igrid](zgs_GridList[igrid][-1],T-1),None,None,None,R,beta,u=u[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])  
         #V, c, s = [Vlast], [clast], [slast]
-        V[desc][T-1] = vpack(Vcs,agrid,zgs_GridList[igrid][-1],T-1,desc)
+        V[T-1][desc] = vpack(Vcs,agrid,zgs_GridList[igrid][-1],T-1,desc)
+        
+        
         
     for t in reversed(range(T-1)):
+        
+        Vnext = V[t+1]
+        Vcurrent = V[t] # passed by reference
+        
         for igrid in range(len(descriptions)):            
             
             desc = descriptions[igrid]
@@ -237,21 +271,24 @@ if __name__ == "__main__":
             gri = zgs_GridList[igrid][t]
             ma  = zgs_MatList[igrid][t]
             
+            
+            
+            
             def integrate(V):
                 return np.dot(V,ma.T)
             
             if desc == "One child, in":
-                Vcomb =  V["One child, in"][t+1].combine(field='V') # combine with no args
-                MU_comb = V["One child, in"][t+1].combine(field='c',fun=mu[igrid])
+                Vcomb =  Vnext["One child, in"].combine(field='V') # combine with no args
+                MU_comb = Vnext["One child, in"].combine(field='c',fun=mu[igrid])                
+            elif desc == "One child, out":                
+                Vcomb   = Vnext["One child, out"].combine( Vnext["One child, in"], ps=pback, field = 'V' )
+                MU_comb = Vnext["One child, out"].combine( Vnext["One child, in"], ps=pback, field = 'c',fun = mu[igrid])                
+            elif desc == "No children":     
+                Vcomb, p =  Vnext["No children"].combine( Vnext["One child, out"], eps=eps, return_p = True)
+                MU_comb = Vnext["No children"].combine( Vnext["One child, out"], ps=p[1], field='c', fun = mu[igrid])
+            else:
+                raise Exception("Unsupported type?")
                 
-            elif desc == "One child, out":
-                
-                Vcomb   = V["One child, out"][t+1].combine( V["One child, in"][t+1], ps=pback, field = 'V' )
-                MU_comb = V["One child, out"][t+1].combine( V["One child, in"][t+1], ps=pback, field = 'c',fun = mu[igrid])                
-            else:       
-                
-                Vcomb, p =  V["No children"][t+1].combine( V["One child, out"][t+1], eps=eps, return_p = True)
-                MU_comb = V["No children"][t+1].combine( V["One child, out"][t+1], ps=p[1], field='c', fun = mu[igrid])
             assert np.all(MU_comb > 0)
             
             
@@ -261,22 +298,21 @@ if __name__ == "__main__":
             
             Vcs = iterator(agrid,labor_income[igrid](gri,t),EV,EMU,ma,R,beta,u=u[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])
             
-            V[desc][t] = vpack(Vcs,agrid,gri,t,desc)
-        
+            Vcurrent[desc] = vpack(Vcs,agrid,gri,t,desc)
         
     it = 0
     
-    print(V["No children"][it][5,1000])
-    print(V["One child, in"][it][5,1000]-V["No children"][it][5,1000])
-    print(V["One child, out"][it][5,1000]-V["No children"][it][5,1000])
+    print(V[it]["No children"][5,1000])
+    print(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000])
+    print(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000])
     
     
     plt.cla()
     plt.subplot(211)
-    V[  "No children"  ][it].plot_value( ['s',['s','c',np.add],np.divide] )
-    V[  "One child, in"][it].plot_value( ['s',['s','c',np.add],np.divide] )
+    V[it][  "No children"  ].plot_value( ['s',['s','c',np.add],np.divide] )
+    V[it][  "One child, in"].plot_value( ['s',['s','c',np.add],np.divide] )
     plt.subplot(212)
-    V["No children"][it].plot_diff(V["One child, in"][it],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
+    V[it]["No children"].plot_diff(V[it]["One child, in"],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
     plt.legend()
         
     
