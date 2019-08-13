@@ -14,8 +14,7 @@ here now
 from generate_grid import generate_zgs
 import matplotlib.pyplot as plt
 import numpy as np
-from vf_tools import smooth_max, smooth_p0
-import uenv
+#from vf_tools import smooth_max, smooth_p0
 from numba import njit
 from valueFunctions import valuefunction, grid_dim_linear, grid_dim_discrete
 
@@ -120,7 +119,8 @@ def vpack(Vcs,agrid,zgsgrid,time,description=""):
     return Vout
     
 def define_u(sigma,u_kid_c,u_kid_add):
-    
+    import uenv
+
     uselog = True if sigma == 1 else False
     
     if uselog:        
@@ -142,11 +142,32 @@ def define_u(sigma,u_kid_c,u_kid_add):
             return factor*(x**(1-sigma))/(1-sigma) + u_kid_add
         
     
-    u =      [u_nok,  u_k, u_k]
-    mu =     [lambda x  : (x**(-sigma)),             lambda x  : factor*(x**(-sigma)),      lambda x  : factor*(x**(-sigma))]
-    mu_inv = [lambda MU : (MU**(-1/sigma)),          lambda MU : ((MU/factor)**(-1/sigma)), lambda MU : ((MU/factor)**(-1/sigma))]
+    
+    u =  {
+            'No children':    u_nok,
+            'One child, out': u_k,
+            'One child, in':  u_k
+         }
+    
+    mu = {
+            'No children':    lambda x  : (x**(-sigma)),
+            'One child, out': lambda x  : factor*(x**(-sigma)),
+            'One child, in':  lambda x  : factor*(x**(-sigma))
+         }
+    
+    mu_inv = {'No children':    lambda MU : (MU**(-1/sigma)),  
+              'One child, out': lambda MU : ((MU/factor)**(-1/sigma)),
+              'One child, in':  lambda MU : ((MU/factor)**(-1/sigma))
+             }
         
-    return u, mu, mu_inv
+    
+    ue = {
+            'No children':    uenv.create(u['No children'],False),
+            'One child, out': uenv.create(u['One child, out'],False),
+            'One child, in':  uenv.create(u['One child, in'],False)
+         }
+    
+    return u, mu, mu_inv, ue
 
 
 def v0(obj):
@@ -159,42 +180,64 @@ def v0(obj):
     
     return o[0]
 
+class switch:
+    
+    @staticmethod
+    def v0def(opts):        
+          
+        while not isinstance(opts[0],str):
+            opts = opts[0].options
+        
+        assert type(opts[0]) is str
+        return opts[0]
 
-class choice:
+class choice(switch):
     def __init__(self,options,eps):
         self.options = options
         self.eps = eps        
-        self.v0 = v0(self)
+        self.v0 = self.v0def(options)
         
         assert isinstance(options,list), 'Choices must be a list!'
-        assert all([isinstance(i,(choice,shock,str)) for i in options]), 'Unsupported thing in choices!'
+        assert all([isinstance(i,(switch,str)) for i in options]), 'Unsupported thing in choices!'
+    
         
         
-        
-class shock:
+class shock(switch):
     def __init__(self,options,ps):
         self.options = options
         self.ps      = ps        
-        self.v0 = v0(self)
+        self.v0 = self.v0def(options)
         
         assert np.abs(sum(ps) - 1)<1e-6
         assert isinstance(options,list), 'Options must be a list!'
-        assert all([isinstance(i,(choice,shock,str)) for i in options]), 'Unsupported thing in options!'
+        assert all([isinstance(i,(switch,str)) for i in options]), 'Unsupported thing in options!'
         
-            
-
-class transition:
-    def __init__(self,to,Vnext):
-        assert (isinstance(to,(choice,shock,str)))
-        
-        self.Vnext = Vnext
-        
-        if isinstance(to,str):
-            self.Vown = Vnext[to]
-        else:
-            self.Vown = Vnext[to.v0]
-                
-
+   
+def ev(Vdict,transition,mu):
+    
+    Vbase = [Vdict[opt]['V'] if (type(opt) is str)
+             else ev(Vdict,opt,mu)[0]
+             for opt in transition.options]
+    
+    EMUbase = [mu(Vdict[opt]['c']) if (type(opt) is str)
+                else ev(Vdict,opt,mu)[1]
+                for opt in transition.options]
+    
+    Vstart = Vdict[transition.v0]
+    
+    if len(Vbase)==1:
+        return Vstart['V'], mu(Vstart['c'])
+    else:
+        if type(transition) is choice:
+            EV, p = Vstart.combine_endo(Vbase,transition.eps,return_p=True)
+            EMU   = Vstart.combine_exo(EMUbase,p[1:])
+            return EV, EMU
+        elif type(transition) is shock:
+            EV = Vstart.combine_exo(Vbase,transition.ps[1:])
+            EMU  = Vstart.combine_exo(EMUbase,transition.ps[1:])
+            return EV, EMU
+    
+    
 
 # this runs the file    
 if __name__ == "__main__":
@@ -234,28 +277,41 @@ if __name__ == "__main__":
     zgs_GridList_nok,   zgs_MatList_nok  = generate_zgs(**a)
     zgs_GridList_k,     zgs_MatList_k  = generate_zgs(**a,fun = lambda g : np.maximum( g - g_kid, 0 ) )
     
-    zgs_GridList = [ zgs_GridList_nok,  zgs_GridList_k, zgs_GridList_k ]
-    zgs_MatList  = [ zgs_MatList_nok ,  zgs_MatList_k,  zgs_MatList_k  ]
+    zgs_GridList = {
+                    'No children': zgs_GridList_nok,
+                    'One child, out': zgs_GridList_k,
+                    'One child, in': zgs_GridList_k
+                   }
+    
+    zgs_MatList  = {
+                    'No children': zgs_MatList_nok,
+                    'One child, out': zgs_MatList_k,
+                    'One child, in': zgs_MatList_k
+                   }
     
     iterator = Vnext_egm
     
-    labor_income = [lambda grid, t : np.exp(grid[:,0] + grid[:,2] + ztrend[t]).T, lambda grid, t : phi_out*np.exp(grid[:,0] + grid[:,2] - z_kid  + ztrend[t]).T, lambda grid, t : phi_in*np.exp(grid[:,0] + grid[:,2] - z_kid  + ztrend[t]).T]
     
-    u, mu, mu_inv = define_u(sigma,u_kid_c,u_kid_add)
     
-    ue = [uenv.create(u[0],False), uenv.create(u[1],False), uenv.create(u[2],False)]
+    labor_income = {
+                    'No children':    lambda grid, t : np.exp(grid[:,0] + grid[:,2] + ztrend[t]).T,
+                    'One child, out': lambda grid, t : phi_out*np.exp(grid[:,0] + grid[:,2] - z_kid  + ztrend[t]).T,
+                    'One child, in':  lambda grid, t : phi_in*np.exp(grid[:,0] + grid[:,2] - z_kid  + ztrend[t]).T
+                   }
+    
+    u, mu, mu_inv, ue = define_u(sigma,u_kid_c,u_kid_add)
+    
+    
         
     
     V = [{ 'No children':None, 'One child, out':None, 'One child, in':None }]*T
     
     descriptions = [*V[0]] 
     
-    for igrid in range(len(descriptions)):
+    for desc in descriptions:
         
-        desc = descriptions[igrid]
-        Vcs = iterator(agrid,labor_income[igrid](zgs_GridList[igrid][-1],T-1),None,None,None,R,beta,u=u[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])  
-        #V, c, s = [Vlast], [clast], [slast]
-        V[T-1][desc] = vpack(Vcs,agrid,zgs_GridList[igrid][-1],T-1,desc)
+        Vcs = iterator(agrid,labor_income[desc](zgs_GridList[desc][-1],T-1),None,None,None,R,beta,u=u[desc],mu_inv=mu_inv[desc],uefun=ue[desc])  
+        V[T-1][desc] = vpack(Vcs,agrid,zgs_GridList[desc][-1],T-1,desc)
         
         
         
@@ -264,56 +320,57 @@ if __name__ == "__main__":
         Vnext = V[t+1]
         Vcurrent = V[t] # passed by reference
         
-        for igrid in range(len(descriptions)):            
-            
-            desc = descriptions[igrid]
-            
-            gri = zgs_GridList[igrid][t]
-            ma  = zgs_MatList[igrid][t]
+        for desc in descriptions:   
             
             
+            gri, ma = zgs_GridList[desc][t], zgs_MatList[desc][t]            
             
-            
-            def integrate(V):
-                return np.dot(V,ma.T)
+            integrate = lambda V : np.dot(V,ma.T)
             
             if desc == "One child, in":
-                Vcomb =  Vnext["One child, in"].combine(field='V') # combine with no args
-                MU_comb = Vnext["One child, in"].combine(field='c',fun=mu[igrid])                
+                transition = choice(["One child, in"],eps)                
             elif desc == "One child, out":                
-                Vcomb   = Vnext["One child, out"].combine( Vnext["One child, in"], ps=pback, field = 'V' )
-                MU_comb = Vnext["One child, out"].combine( Vnext["One child, in"], ps=pback, field = 'c',fun = mu[igrid])                
+                transition = shock(["One child, out","One child, in"],[1-pback,pback])
             elif desc == "No children":     
-                Vcomb, p =  Vnext["No children"].combine( Vnext["One child, out"], eps=eps, return_p = True)
-                MU_comb = Vnext["No children"].combine( Vnext["One child, out"], ps=p[1], field='c', fun = mu[igrid])
+                if_child = shock(["One child, out","One child, in"],[1,0])
+                transition = choice(["No children",if_child],eps)              
             else:
                 raise Exception("Unsupported type?")
                 
-            assert np.all(MU_comb > 0)
+                
+            Vcomb, MU_comb = ev(Vnext,transition,mu=mu[desc])
+                
+            assert np.all(MU_comb > 0)            
             
+            EV, EMU  = integrate(  Vcomb  ), integrate(  MU_comb  )            
             
-            EV  = integrate(  Vcomb  )
-            EMU = integrate( MU_comb )
-            
-            
-            Vcs = iterator(agrid,labor_income[igrid](gri,t),EV,EMU,ma,R,beta,u=u[igrid],mu_inv=mu_inv[igrid],uefun=ue[igrid])
+            Vcs = iterator(agrid,labor_income[desc](gri,t),EV,EMU,ma,R,beta,u=u[desc],mu_inv=mu_inv[desc],uefun=ue[desc])
             
             Vcurrent[desc] = vpack(Vcs,agrid,gri,t,desc)
         
+    
     it = 0
     
-    print(V[it]["No children"][5,1000])
-    print(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000])
-    print(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000])
+    try:
+        assert np.abs(V[it]["No children"][5,1000] - 60.043482353008635)<1e-10
+        assert np.abs(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000] + 4.6052711813603295) < 1e-10
+        assert np.abs(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000] + 7.95700682295378) < 1e-10
+        print('Tests are ok!')
+    except:   
+        # draw things and print diagnostic informatio
+        print(V[it]["No children"][5,1000])
+        print(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000])
+        print(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000])
+        plt.cla()
+        plt.subplot(211)
+        V[it][  "No children"  ].plot_value( ['s',['s','c',np.add],np.divide] )
+        V[it][  "One child, in"].plot_value( ['s',['s','c',np.add],np.divide] )
+        plt.subplot(212)
+        V[it]["No children"].plot_diff(V[it]["One child, in"],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
+        plt.legend()
     
     
-    plt.cla()
-    plt.subplot(211)
-    V[it][  "No children"  ].plot_value( ['s',['s','c',np.add],np.divide] )
-    V[it][  "One child, in"].plot_value( ['s',['s','c',np.add],np.divide] )
-    plt.subplot(212)
-    V[it]["No children"].plot_diff(V[it]["One child, in"],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
-    plt.legend()
+    
         
     
     
