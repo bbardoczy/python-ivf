@@ -10,13 +10,12 @@ This thing runs the main calculations for IVF project.
 
 """
 
-import matplotlib.pyplot as plt
-import numpy as np
+#import numpy as np
+
 from model import model
     
 # this runs the file    
 if __name__ == "__main__":
-    
     
     pars_in = dict(
                     T = 20,
@@ -40,34 +39,13 @@ if __name__ == "__main__":
     
     T = pars_in['T']
     
-    
-    # set iterator
+    # solve the model
     M = model(pars_in,"EGM")
     M.compute_V()
     V = M.V
+    M.refactoring_check()
     
-    # initialize V
     
-    it = 0
-    
-    try:
-        assert np.abs(V[it]["No children"][5,1000] - 60.043482353008635)<1e-10
-        assert np.abs(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000] + 4.6052711813603295) < 1e-10
-        assert np.abs(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000] + 7.95700682295378) < 1e-10
-        print('Tests are ok!')
-    except:   
-        # draw things and print diagnostic informatio
-        print(V[it]["No children"][5,1000])
-        print(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000])
-        print(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000])
-        plt.cla()
-        plt.subplot(211)
-        V[it][  "No children"  ].plot_value( ['s',['s','c',np.add],np.divide] )
-        V[it][  "One child, in"].plot_value( ['s',['s','c',np.add],np.divide] )
-        plt.subplot(212)
-        V[it]["No children"].plot_diff(V[it]["One child, in"],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
-        plt.legend()
-        raise Exception('Tests are not ok!')
     
     
     

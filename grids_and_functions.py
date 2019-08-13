@@ -135,6 +135,10 @@ class setupClass:
         
         pars = self.pars
         
+        
+        
+        
+        
         self.labor_income = {
                         'No children':    lambda grid, t : np.exp(grid[:,0] + grid[:,2] + self.ztrend[t]).T,
                         'One child, out': lambda grid, t : pars['phi_out']*np.exp(grid[:,0] + grid[:,2] - pars['z_kid']  + self.ztrend[t]).T,
