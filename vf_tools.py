@@ -1,4 +1,5 @@
 # these are tools for value functions
+# this is mostly meant to be reusable
 import numpy as np
 from interp_my import interpolate_vector_matrix
 from numba import jit
