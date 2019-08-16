@@ -28,6 +28,8 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
         
         uecount = 0
         
+        
+        
         for i in range(m_of_anext.shape[1]):
             
             if not np.all(np.diff(m_of_anext[:,i])>0):
