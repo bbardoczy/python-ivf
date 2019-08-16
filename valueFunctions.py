@@ -49,8 +49,10 @@ class grid_dim_discrete(grid_dim):
 class gridval():
     def __init__(self,grids,values,check=True):
         
-        assert isinstance(grids,  list), "First argument should be list ([])!"
-        assert isinstance(values, dict), "Second argument should be dict ({'a':b})!"
+        assert isinstance(grids,  list), \
+        "First argument should be list ([])!"
+        assert isinstance(values, dict), \
+        "Second argument should be dict ({'a':b})!"
         
         self.grids = grids
         self.values = values
@@ -73,7 +75,9 @@ class gridval():
             assert isinstance(j,grid_dim)
         
         for k in self.values.keys():
-            assert np.shape(self.values[k]) == self.shp, "True shapes are {} and {}".format(np.shape(self.values[k]), self.shp)
+            assert np.shape(self.values[k]) == self.shp, \
+            "True shapes are {} and {}". \
+            format(np.shape(self.values[k]), self.shp)
             
             
 # basic value function (collection of V and decision rules)
@@ -85,6 +89,7 @@ class valuefunction(gridval):
         self.V = self.values['V']
         self.time = time
         self.description = description
+        
     
     
     def __getitem__(self, key):
@@ -104,10 +109,13 @@ class valuefunction(gridval):
         
         else: # treat this as if we ask about V
             return self.values['V'][key]
+    
             
     
     def integrate(self,integrator,*args):
         return integrator(self,*args)
+    
+    
     
     
     def plot_value(self,field, iz = None):
@@ -165,6 +173,109 @@ class valuefunction(gridval):
         #return y
     
     
+    def combine(
+            self,vlist=None,ps=None,eps=None,field='V',
+            fun = lambda x : x, return_p = False):
+        # combines multiple value functions
+        # if plist is supplied 
+        # ps contains probabilities or eps contains taste shocks standard deviations
+        
+        assert (ps is None) or (eps is None)
+        
+        if vlist is None:
+            return fun(self[field])
+        
+        
+        if not isinstance(vlist,list):
+            vlist = [vlist]
+            
+        v_in = [fun(self[field])] + [ fun(i[field]) 
+                                        if type(i) is valuefunction
+                                        else fun(i) for i in vlist ]
+            
+            
+        if ps is not None:
+            # exogenous combination
+            if (not isinstance(ps,list)):
+                ps = [ps]
+            return self.combine_exo(v_in,ps)
+        else:
+            return self.combine_endo(v_in,eps,return_p = return_p)
         
     
+    def combineV(self,*args,**kwargs):
+        val = self.combine(*args,**kwargs)
+        return valuefunction(self.grids,{'V':val},self.time,description='EV')
+            
+    
+            
+       
+    @staticmethod    
+    def combine_endo(vlist,eps,return_p=False):
+        vmax = np.maximum(*vlist)
+        
+        
+        p = [None]*len(vlist)
+        
+        if eps > 1e-6:
+            S = 0.0
+            
+            for i in range(len(vlist)):
+                p[i] = np.exp((vlist[i] - vmax)/eps)
+                S += p[i]
+            
+            p = [j/S for j in p]
+            assert np.all(S >= 1.0)
+            
+        else:
+            S = 1.0 # does not matter            
+            
+            for i in range(len(vlist)):
+                p[i] = np.float64(vlist[i]==vmax)
+                
+        """    
+        # test
+        if len(vlist)==2:
+            v0 = vmax + eps*np.log(S) - eps*np.log(len(vlist)) 
+            from vf_tools import smooth_max
+            assert np.all(np.abs(v0 - smooth_max(vlist[0],vlist[1],eps))<1e-6)
+        """
+        
+        if not return_p:
+            return vmax + eps*np.log(S) - eps*np.log(len(vlist))
+        else:
+            return vmax + eps*np.log(S) - eps*np.log(len(vlist)), p
+        
+    
+    
+    
+    @staticmethod
+    def combine_exo(vlist,plist_wo_0):
+        
+        if type(plist_wo_0[0]) is np.ndarray:
+            Psum = np.zeros_like(plist_wo_0[0])
+            
+            for i in range(len(plist_wo_0)):
+                Psum += plist_wo_0[i]
+        else:
+            Psum = np.sum(plist_wo_0)
+                
+        
+        p0 = 1-Psum
+        
+        assert np.all(p0 >= 0) and np.all(p0 <= 1)
+        plist = [p0] + plist_wo_0
+        
+        assert len(vlist) == len(plist)
+        
+        S = 0.0
+        for i in range(len(vlist)):
+            S += plist[i]*vlist[i]
+        
+        return S
+        
+        
+        
+            
+            
 

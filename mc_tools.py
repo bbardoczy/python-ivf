@@ -7,7 +7,8 @@ def mc_simulate(statein,Piin,shocks=None):
     # this simulates transition one period ahead for a Markov chain
     import numpy as np
     assert(np.max(statein) < Piin.shape[1] )
-    n_in = len(statein)
+    assert statein.ndim == 1
+    n_in = statein.size
     Picum = np.cumsum(Piin,axis=1)
     Pi_state = Picum[statein,:]
     #print(Pi_state)
@@ -18,8 +19,11 @@ def mc_simulate(statein,Piin,shocks=None):
         rand = shocks[:,np.newaxis]
     
     rand_state = rand.repeat(Piin.shape[1],axis=1)
-    stateout = np.sum((rand_state >= Pi_state),axis=1) # note that numeration starts with 0
+    stateout = np.zeros_like(statein)
+    stateout[:] = np.sum((rand_state >= Pi_state),axis=1).squeeze() # note that numeration starts with 0
     assert(np.max(stateout) < Piin.shape[1])
+    assert stateout.shape == statein.shape
+    
     return stateout 
 
 # yet another    

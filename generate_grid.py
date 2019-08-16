@@ -95,3 +95,10 @@ def generate_zgs(sigma_z_init=0.15,sigma_z=0.1,nz=10,T=40,
         zgs_GridList, zgs_MatList = combine_matrices_two_lists(zval,gslist,zMat,matlist,trim=False)
     
     return zgs_GridList, zgs_MatList
+
+
+
+def generate_agrid(n=200,amax=20,amin=0,pivot=0.25):
+    a = np.geomspace(amin+pivot,amax+pivot,n) - pivot
+    a[0] = amin
+    return a
