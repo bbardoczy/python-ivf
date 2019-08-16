@@ -6,18 +6,19 @@ from numba import jit
 import pytest
 
 
+no_py = True
 
 
-
-@jit(nopython=True)
-def interpolate_vv(x,xd,y,istart,testorder=False):
+@jit(nopython=no_py)
+def interpolate_vv(x,xd,y,istart,testorder=False,xd_ordered=True):
     # this one was written by Matthew Rognlie at Northwestern
     # I modify it by including starting value
     # some syntax is a bit odd to use (nopython=True)
     
     if testorder:
         assert np.all(np.diff(x)>0), 'sample xs not ordered'
-        assert np.all(np.diff(xd)>0), 'desired xs not ordered'
+        if xd_ordered:
+            assert np.all(np.diff(xd)>0), 'desired xs not ordered'
     
     
     xdi = np.empty(xd.size, np.int64)
@@ -37,6 +38,8 @@ def interpolate_vv(x,xd,y,istart,testorder=False):
     for xdi_cur in range(nxd):
         xd_cur = xd[xdi_cur]
         
+        if not xd_ordered:
+            xi = 0 # reset
             
         # replace if have starting guess
         if istart[xdi_cur] > xi:
@@ -82,7 +85,7 @@ def test_interpolate_vv():
     assert np.all(interpolate_vv(x,xq,y,istart)[2] == np.array([3.5,2.5])), 'vector is not ok'
     
 
-@jit(nopython=True)
+@jit(nopython=no_py)
 def interpolate_precomputed(xdi,xdpi,y):
     
     Yq = np.empty(xdi.shape,np.float64)
@@ -95,11 +98,12 @@ def interpolate_precomputed(xdi,xdpi,y):
     return Yq
 # note: xdi is index in x, xdpi is the share of the next point, yd is interpolated value
   
-@jit(nopython=True)
-def interpolate_nostart(x,xd,y):
+@jit(nopython=no_py)
+def interpolate_nostart(x,xd,y,testorder=False,xd_ordered=True):
+    # NB: order is not checked
     istart = np.zeros(xd.shape, np.int64)
     
-    xdi, xdpi, yd = interpolate_vv(x,xd,y,istart,testorder=False)
+    xdi, xdpi, yd = interpolate_vv(x,xd,y,istart,testorder=testorder,xd_ordered=xd_ordered)
     
     return xdi, xdpi, yd
   
@@ -118,7 +122,7 @@ def interpolate(x,y,xq,axis=0,rsorted=True,csroted=True):
     return 1
 
 # this needs to be njited as array slicing is not supported somehow
-@jit(nopython=True)
+@jit(nopython=no_py)
 def interpolate_vector_matrix(x,y,xq,rsorted=True,csorted=True):
     # this interpolates vector y with domain given by x at each point of xq.
     # xq is assumed to be a matrix with at least rows sorted

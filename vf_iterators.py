@@ -3,7 +3,7 @@
 import numpy as np
 
 def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv=None,uefun=None):
-    
+    #raise Exception('This should not work!')
     
     if m is None: # we can override m
         m = np.float64( R*agrid[:,np.newaxis] + labor_income )
@@ -60,7 +60,7 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
                 V[:,i] = u(c[:,i]) + beta*EV_next_a_i          
             
         
-        if uecount>0:
+        if uecount>0 and False:
             print("Upper envelope count: {}".format(uecount))
         
     return V, c, s
