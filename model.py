@@ -88,29 +88,25 @@ class Model:
         
         # this part is backward iteration
         for t in reversed(range(T)):
-            Vthis = { 'No children':None, 'One child, out':None, 'One child, in':None }
             
-            
-            
-            for desc in self.descriptions:
-                if t == T-1:
-                    #Vcs = self.initialize(desc,t)  
-                    Vthis[desc] = self.initialize(desc,t)  
-                else:
-                    Vnext = self.V[0]
-                    s = self.setup
-                    ma = s.zgs_Mats[desc][t]            
-                             
+            if t == T-1:
+                Vthis = [self.initialize(desc,t)  for desc in self.descriptions]
+            else:
+                Vnext = self.V[0]
+                s = self.setup
+                
+                def get_V(desc):
+                    
+                    ma = s.zgs_Mats[desc][t]          
                     Vcomb, MU_comb = ev_emu(Vnext,s.transitions[desc],mu=s.mu[desc])                
                     EV, EMU  = integrate(  Vcomb , ma ), integrate(  MU_comb , ma )  
-                    #Vcs = self.iterate(desc,t,EV,EMU)
-                    Vthis[desc] = self.iterate(desc,t,EV,EMU)
-                    
-                    #assert not np.all(self.V[t][desc]==self.V[t+1][desc])
-                    assert np.all(MU_comb > 0)  
-        
-        
-            self.V = [Vthis] + self.V
+                    VV = self.iterate(desc,t,EV,EMU)
+                    return VV
+                
+                Vthis = [get_V(d) for d in self.descriptions]
+                
+            V_dict = dict(zip(self.descriptions,Vthis))
+            self.V = [V_dict] + self.V
                 #self.V[t][desc] = self.vpack(Vcs,t,desc)
             
     
