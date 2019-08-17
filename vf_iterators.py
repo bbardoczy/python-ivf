@@ -2,6 +2,10 @@
 
 import numpy as np
 
+
+
+
+
 def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv=None,uefun=None):
     #raise Exception('This should not work!')
     
@@ -27,8 +31,6 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
         V = np.empty_like(m)
         
         uecount = 0
-        
-        
         
         for i in range(m_of_anext.shape[1]):
             
