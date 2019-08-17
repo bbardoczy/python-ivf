@@ -123,9 +123,9 @@ class Model:
         it = 0
     
         try:
-            assert np.abs(V[it]["No children"][5,1000] - 60.043482353008635)<1e-10
-            assert np.abs(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000] + 4.6052711813603295) < 1e-10
-            assert np.abs(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000] + 7.95700682295378) < 1e-10
+            assert np.abs(V[it]["No children"][5,1000] - 60.04361005581497)<1e-10
+            assert np.abs(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000] + 4.605243004294415) < 1e-10
+            assert np.abs(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000] + 7.956746814857432 ) < 1e-10
             print('Tests are ok!')
         except:   
             import matplotlib.pyplot as plt
