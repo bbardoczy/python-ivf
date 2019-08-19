@@ -14,8 +14,28 @@ This thing runs the main calculations for IVF project.
 
 from model import Model, Agents
 from timeit import default_timer
-
+#from numba import jit
     
+
+
+def model_solve(pars):#,return_am=False):
+    
+    
+        M = Model(pars,"EGM")
+        M.compute_V()
+        #V = M.V
+        #M.refactoring_check()
+        
+        a = Agents(M)
+        a.simulate()
+        
+        return_am=False
+        
+        if return_am:
+            return a, M
+        else:
+            return a.state.mean(axis=0)
+        
 # this runs the file    
 if __name__ == "__main__":
     
@@ -41,24 +61,11 @@ if __name__ == "__main__":
                     sigma_g=0.1,rho_g=0.8,ng=7,smax=4.12,ns=16
                   )
     
-    
-    def model_solve(pars,return_am=False):
-    
-    
-        M = Model(pars,"EGM")
-        M.compute_V()
-        #V = M.V
-        #M.refactoring_check()
-        
-        a = Agents(M)
-        a.simulate()
-        
-        if return_am:
-            return a, M
-        else:
-            return a.state.mean(axis=0)
+    #@jit
     
     from multiprocessing import Pool
+    from scoop import futures
+
     pool = Pool(4)
     
     
@@ -75,17 +82,26 @@ if __name__ == "__main__":
         plist[i]['u_kid_add'] = plist[0]['u_kid_add'] + 0.01*i
         
     
-    '''
+    
     ser_start = default_timer()
     g = [model_solve(p) for p in plist]
     ser_finish = default_timer()
     print('Serial time is {} seconds'.format( round(ser_finish-ser_start, 2)) )
-    '''
+    
+    
     
     par_start = default_timer()
     g = pool.map(model_solve, plist)
     par_finish = default_timer()
     print('Parallel time is {} seconds'.format( round(par_finish-par_start,2) ))
+    
+    
+    scoop_start = default_timer()
+    g = list(futures.map(model_solve, plist))
+    scoop_finish = default_timer()
+    print('Scoop time is {} seconds'.format( round(scoop_finish-scoop_start,2) ))
+    
+    
     
     finish = default_timer()
     print( 'Total time is {} seconds'.format( round(finish - start,2) ) )
