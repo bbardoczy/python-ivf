@@ -14,10 +14,10 @@ This thing runs the main calculations for IVF project.
 
 from model import Model, Agents
 from timeit import default_timer
-#from numba import jit
+from numba import jit
     
 
-
+@jit
 def model_solve(pars):#,return_am=False):
     
     
@@ -61,45 +61,49 @@ if __name__ == "__main__":
                     sigma_g=0.1,rho_g=0.8,ng=7,smax=4.12,ns=16
                   )
     
-    #@jit
     
-    from multiprocessing import Pool
-    from scoop import futures
+    #from multiprocessing import Pool
+    from scoop import futures, logger
 
-    pool = Pool(4)
+    #pool = Pool(4)
     
     
     
-    nit = 4
-    plist = [pars_in.copy() for i in range(nit)]
+    nit_ser = 5
+    plist_ser = [pars_in.copy() for i in range(nit_ser)]
+
+    nit_par = 55
+    plist_par = [pars_in.copy() for i in range(nit_par)]
     
     # NB: this is a shallow copy. Make sure all elements are primitive and not links
     
     
     
     
-    for i in range(nit):
-        plist[i]['u_kid_add'] = plist[0]['u_kid_add'] + 0.01*i
+    
+    for plist in [plist_ser,plist_par]:
+        for i in range(len(plist)):
+            plist[i]['u_kid_add'] = plist[0]['u_kid_add'] + 0.0025*i
         
     
     
     ser_start = default_timer()
-    g = [model_solve(p) for p in plist]
+    g = [model_solve(p) for p in plist_ser]
     ser_finish = default_timer()
-    print('Serial time is {} seconds'.format( round(ser_finish-ser_start, 2)) )
+    print('Serial time per iteration is {} seconds'.format( round( (ser_finish-ser_start)/nit_ser, 2)) )
     
     
-    
+    '''
     par_start = default_timer()
     g = pool.map(model_solve, plist)
     par_finish = default_timer()
-    print('Parallel time is {} seconds'.format( round(par_finish-par_start,2) ))
-    
+    print('Parallel time is {} seconds'.format( round(par_finish-par_start,2 )))
+    '''
     
     scoop_start = default_timer()
-    g = list(futures.map(model_solve, plist))
+    g = list(futures.map(model_solve, plist_par))
     scoop_finish = default_timer()
-    print('Scoop time is {} seconds'.format( round(scoop_finish-scoop_start,2) ))
+    print('Scoop time per iteration is {} seconds'.format( round((scoop_finish-scoop_start)/nit_par,2) ))
     
     
     
@@ -107,6 +111,4 @@ if __name__ == "__main__":
     print( 'Total time is {} seconds'.format( round(finish - start,2) ) )
     
     
-    pool.close()
-    del pool
     
