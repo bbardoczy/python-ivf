@@ -34,14 +34,18 @@ def generate_GS_matrix(sigma_g=0.1,rho_g=0.8,ng=10,smin=0,smax=4.12,ns=20,fun = 
     # define S transition matrix for each g
     Slist = list()
     for ig in range(G.size):
-        snext = sgrid + mult_i*fun(G[ig])
-    
+        snext = np.minimum( np.maximum( sgrid + mult_i*fun(G[ig]), sgrid[0] ), sgrid[-1] )
+        assert mult_i >= 0
+        
         T = np.zeros((sgrid.size,sgrid.size))
         j_to, p_to = transition_uniform(sgrid,snext)
     
+        
+        
         for jj in range(sgrid.size):
             T[jj,j_to[jj]]   =      p_to[jj]
             T[jj,j_to[jj]+1] =  1 - p_to[jj]
+            
             
         assert (np.all(np.abs(np.sum(T,axis=1)-1)<1e-5 ))
         

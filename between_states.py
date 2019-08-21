@@ -137,6 +137,9 @@ def ev_emu(Vdict,transition,mu):
                 else ev_emu(Vdict,opt,mu)[1]
                 for opt in transition.options]
     
+    
+    
+    
     Vstart = Vdict[transition.v0]
     
     if len(Vbase)==1:

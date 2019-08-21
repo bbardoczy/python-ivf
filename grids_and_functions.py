@@ -114,19 +114,21 @@ class setupClass:
                      sigma_g=pars['sigma_g'],rho_g=pars['rho_g'],ng=pars['ng'],smin=0,smax=pars['smax'],ns=pars['ns'],
                      T=pars['T'],mult=self.gtrend)
         
-        zgs_GridList_nok,   zgs_MatList_nok  = generate_zgs(**a)
-        zgs_GridList_k,     zgs_MatList_k  = generate_zgs(**a,fun = lambda g : np.maximum( g - pars['g_kid'], 0 ) )
+        zgs_GridList_nok,    zgs_MatList_nok   = generate_zgs(**a)
+        zgs_GridList_k_in,  zgs_MatList_k_in   = generate_zgs(**a,fun = lambda g : np.maximum( g - pars['g_kid'], 0 ) )
+        zgs_GridList_k_out, zgs_MatList_k_out  = generate_zgs(**a,fun = lambda g : -pars['delta_out'] )
+        
         
         self.zgs_Grids =    {
                             'No children': zgs_GridList_nok,
-                            'One child, out': zgs_GridList_k,
-                            'One child, in': zgs_GridList_k
+                            'One child, out': zgs_GridList_k_out,
+                            'One child, in': zgs_GridList_k_in
                             }
         
         self.zgs_Mats  =    {
                             'No children': zgs_MatList_nok,
-                            'One child, out': zgs_MatList_k,
-                            'One child, in': zgs_MatList_k
+                            'One child, out': zgs_MatList_k_out,
+                            'One child, in': zgs_MatList_k_in
                             }
         
 
@@ -143,7 +145,7 @@ class setupClass:
                         'No children':    lambda grid, t : np.exp(grid[:,0] + grid[:,2] + self.ztrend[t]).T,
                         'One child, out': lambda grid, t : pars['phi_out']*np.exp(grid[:,0] + grid[:,2] - pars['z_kid']  + self.ztrend[t]).T,
                         'One child, in':  lambda grid, t : pars['phi_in']*np.exp(grid[:,0] + grid[:,2]  - pars['z_kid']  + self.ztrend[t]).T
-                       }
+                            }
         
 
     

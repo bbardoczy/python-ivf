@@ -39,7 +39,7 @@ def v_optimize(m,agrid,beta,EV,ns=200,minc=0.001,u=None):
     sshare = np.concatenate( (np.linspace(0,0.5,ns_low), np.linspace(0.5+(1/ns),1-minc,ns-ns_low)))
     
     
-    transform = True if u(1e6) < 0 else False
+    transform = False
     
     
     
@@ -48,9 +48,23 @@ def v_optimize(m,agrid,beta,EV,ns=200,minc=0.001,u=None):
            
         mi = m[:,iz]
         
-        ap_val = np.expand_dims(mi,1) * sshare
+        ap_val = np.minimum( np.expand_dims(mi,1) * sshare, agrid[-1] )
         c_val  = np.expand_dims(mi,1) - ap_val
         uc    = u(c_val)
+        
+        
+        '''
+        ap_max = np.max(ap_val)
+        
+        
+        i_max = np.minimum( np.searchsorted(agrid,ap_max,side='right'), EV.shape[0]-1)
+        
+        if  EV[i_max,iz] < -0.001:
+            transform = True
+        else:
+            transform = False
+        '''
+        transform = False
         
         V_opt, i_opt = v_optimize_one(EV[:,iz],agrid,uc,ap_val,beta,transform)
         
@@ -62,7 +76,19 @@ def v_optimize(m,agrid,beta,EV,ns=200,minc=0.001,u=None):
         for ia in range(0,m.shape[0]):
             c[ia,iz] = c_val [ia,i_opt[ia]]
             s[ia,iz] = ap_val[ia,i_opt[ia]]
+        
+        '''
+        try:
+            assert np.all(np.diff(s[:,iz]) >= 0)
+        except:
+            import matplotlib.pyplot as plt
             
+            plt.plot(agrid,s[:,iz])
+            plt.pause(0.05)
+            
+            g = input('stop?')
+            if g == 'yes': raise Exception('look at that')
+         '''  
     return V, c, s
     
 

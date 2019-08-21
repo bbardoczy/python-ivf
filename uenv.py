@@ -66,6 +66,11 @@ def create(ufunc,use_inv_w=False):
                 v_ast_vec[im] = u + inv_w_vec[0]
 
             im += 1
+            
+            
+        # fix at maximum m
+        
+        
 
         # upper envellope
         # apply the upper envelope algorithm
@@ -79,15 +84,18 @@ def create(ufunc,use_inv_w=False):
             inv_w_low  = inv_w_vec[ia]
             inv_w_high = inv_w_vec[ia+1]
 
-            if a_low > a_high:
-                continue
-
+            
             inv_w_slope = (inv_w_high-inv_w_low)/(a_high-a_low)
             
             # b. m inteval and c slope
             m_low  = m_vec[ia]
             m_high = m_vec[ia+1]
 
+
+            #if m_low > m_high:
+            #    continue
+            
+            
             c_low  = c_vec[ia]
             c_high = c_vec[ia+1]
 
@@ -105,16 +113,32 @@ def create(ufunc,use_inv_w=False):
 
                 # iii. interpolation (or extrapolation)
                 if interp or extrap_above:
-
+                    
+                    
                     # o. implied guess
                     c_guess = c_low + c_slope * (m - m_low)
-                    a_guess = m - c_guess
-
+                    
+                    #assert c_guess > 0
+                    
+                    a_guess =  m - c_guess
+                    #a_guess = np.maximum(  m - c_guess, grid_a[0] )
+                    #c_guess = m - a_guess
+                    
+                    
+                    #assert not(np.isnan(c_guess)) and (c_guess > 0)
+                    
                     # oo. implied post-decision value function
-                    inv_w = inv_w_low + inv_w_slope * (a_guess - a_low)                
+                    inv_w = inv_w_low + inv_w_slope * (a_guess - a_low)  
+                    
+                    if a_guess < grid_a[0]:  inv_w = -np.inf 
+                    if a_guess >= grid_a[-1]: inv_w = inv_w_vec[-1]
 
                     # ooo. value-of-choice
-                    u = ufunc(c_guess,*args)
+                    u = ufunc(c_guess,*args) if c_guess > 0 else -np.inf
+                    
+                    
+                    
+                    
                     if use_inv_w:
                         v_guess = u + (-1/inv_w)
                     else:
@@ -124,5 +148,16 @@ def create(ufunc,use_inv_w=False):
                     if v_guess > v_ast_vec[im]:
                         v_ast_vec[im] = v_guess
                         c_ast_vec[im] = c_guess
-    
+                        assert m > 0
+                        assert c_ast_vec[im] >= 0
+                       
+        
+        #for im
+        '''
+        if c_ast_vec[-1] == 0:
+            c_slope = (c_ast_vec[-2] - c_ast_vec[-3]) / ( grid_m[-2] - grid_m[-3] )
+            v_slope = (v_ast_vec[-2] - v_ast_vec[-3]) / ( grid_a[-2] - grid_a[-3] )
+            c_ast_vec[-1] = c_ast_vec[-2] + c_slope*( grid_m[-1] - grid_m[-2] )
+            v_ast_vec[-1] = v_ast_vec[-2] + v_slope*( grid_a[-1] - grid_a[-2] )
+        '''
     return upperenvelope

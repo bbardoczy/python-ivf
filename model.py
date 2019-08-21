@@ -50,13 +50,62 @@ class Model:
             s = self.setup
             
             def iterate(desc,t,EV,EMU):
-                gri, ma = s.zgs_Grids[desc][t], s.zgs_Mats[desc][t]            
-                Vcs = Vnext_egm(s.agrid,s.labor_income[desc](gri,t),EV,EMU,ma,s.pars['R'],s.pars['beta'],u=s.u[desc],mu_inv=s.mu_inv[desc],uefun=s.ue[desc])
+                gri, ma = s.zgs_Grids[desc][t], s.zgs_Mats[desc][t]     
+                Vcs = Vnext_egm(s.agrid,s.labor_income[desc](gri,t),EV,EMU,ma,s.pars['R'],s.pars['beta'],u=s.u[desc],mu_inv=s.mu_inv[desc],uefun=s.ue[desc])                
+                
+                
                 return vpack(Vcs,t,desc)
         
             def initialize(desc,t):
                 return iterate(desc,t,None,None)
             
+        elif name == "EGM-debug":
+            
+            
+            s = self.setup
+            
+            def iterate(desc,t,EV,EMU):
+                gri, ma = s.zgs_Grids[desc][t], s.zgs_Mats[desc][t]   
+                try:
+                    Vcs = Vnext_egm(s.agrid,s.labor_income[desc](gri,t),EV,EMU,ma,s.pars['R'],s.pars['beta'],u=s.u[desc],mu_inv=s.mu_inv[desc],uefun=s.ue[desc])                
+                except:
+                    print('warning: egm fails')
+                    Vcs = Vnext_vfi(s.agrid,s.labor_income[desc](gri,t),EV,EMU,ma,s.pars['R'],s.pars['beta'],u=s.u[desc],mu_inv=s.mu_inv[desc],uefun=s.ue[desc])
+                
+                return vpack(Vcs,t,desc)
+        
+            def initialize(desc,t):
+                return iterate(desc,t,None,None)
+            
+        
+        elif name == "EGM-compare":
+            
+            s = self.setup
+            
+            def iterate(desc,t,EV,EMU):
+                gri, ma = s.zgs_Grids[desc][t], s.zgs_Mats[desc][t]     
+                Vcs  = Vnext_egm(s.agrid,s.labor_income[desc](gri,t),EV,EMU,ma,s.pars['R'],s.pars['beta'],u=s.u[desc],mu_inv=s.mu_inv[desc],uefun=s.ue[desc])                
+                Vcs2 = Vnext_vfi(s.agrid,s.labor_income[desc](gri,t),EV,EMU,ma,s.pars['R'],s.pars['beta'],u=s.u[desc],mu_inv=s.mu_inv[desc],uefun=s.ue[desc]) 
+                
+                print('Maximum differences:')
+                
+                g = lambda x : np.log(1+x)
+                
+                mdiff_v = np.max(np.abs(Vcs2[0] - Vcs[0]))
+                mdiff_c = np.median(np.abs(g(Vcs2[1]) - g(Vcs[1])))
+                mdiff_s = np.median(np.abs(g(Vcs2[2]) - g(Vcs[2])))
+                
+                print( 'V (max): {}, c (median): {}, s (median): {}'.format(mdiff_v,mdiff_c,mdiff_s) )
+                
+                return vpack(Vcs,t,desc)
+        
+            def initialize(desc,t):
+                return iterate(desc,t,None,None)
+        
+            
+            
+            
+        
         elif name == "VFI":
             
             s = self.setup

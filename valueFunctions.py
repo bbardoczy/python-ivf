@@ -266,6 +266,8 @@ class valuefunction(gridval):
         assert np.all(p0 >= 0) and np.all(p0 <= 1)
         plist = [p0] + plist_wo_0
         
+        assert(np.all(np.abs(sum(plist) - 1)<1e-5))
+        
         assert len(vlist) == len(plist)
         
         S = 0.0
