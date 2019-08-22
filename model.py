@@ -128,7 +128,7 @@ class Model:
     def compute_V(self):
         #self.V =  [{ 'No children':None, 'One child, out':None, 'One child, in':None }]*self.setup.pars['T']
         self.V = list()
-        self.descriptions = ['No children', 'One child, out', 'One child, in']#[*self.V[0]]
+        self.descriptions = ['No children', 'One child, out', 'One child, in','Two children, out', 'Two children, in']#[*self.V[0]]
         
         T = self.setup.pars['T']
         
@@ -234,15 +234,18 @@ class Agents:
             s_ip = self.V[t][sname]['s'][self.iassets[ind,t]+1,self.iexo[ind,t]].reshape(nst)
             w_i = self.wassets[ind,t].reshape(nst)
             anext_val =  w_i*s_i + (1-w_i)*s_ip 
+            
+            
             assert np.all(anext_val >= 0)
+            
             #print((agrid.shape[0],anext_val.shape[0]))
             try:
                 self.iassets[ind,t+1], self.wassets[ind,t+1], atest = interpolate_nostart(agrid,anext_val,agrid,xd_ordered=False)
             except:
                 print(t,agrid.shape,anext_val.shape, w_i, s_i, s_ip)
-                raise Exception('aa')
+                raise Exception('interpolator stopped working again')
                 
-            assert np.all(np.abs(atest - anext_val) < 1e-6)
+            assert np.all(np.abs(atest - anext_val) < 1e-2)
     
     def iexonext(self,t):
         # let's find out new state

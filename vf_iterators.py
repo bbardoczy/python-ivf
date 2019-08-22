@@ -1,16 +1,16 @@
 # this collects iterators for value functions
 
 import numpy as np
+#from numba import jit
 
 
 
-
-
+#@jit
 def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv=None,uefun=None):
     #raise Exception('This should not work!')
     
     if m is None: # we can override m
-        m = np.float64( R*agrid[:,np.newaxis] + labor_income )
+        m = np.array( R*agrid[:,np.newaxis] + labor_income, np.float )
         
     
     dc = True
@@ -68,7 +68,7 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
                 
                 
                 # this is debugger
-                
+                '''
                 try:
                     assert np.all(c[:,i]>0)
                 except:
@@ -93,7 +93,7 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
                     plt.pause(0.05)
                     #print((m[:,i],m_of_anext[:,i],c_of_anext[:,i],s[:,i]))
                     raise Exception('wow')
-                    
+                '''  
                 
             else:
                 
@@ -125,7 +125,7 @@ def Vnext_vfi(agrid,labor_income,EV_next,c_next,Pi,R,beta,m=None,u=None,mu=None,
     from vf_tools import v_optimize
     
     if m is None: # we can override m
-        m = np.array( R*agrid[:,np.newaxis] + labor_income , np.float64)
+        m = np.array( R*agrid[:,np.newaxis] + labor_income , np.float)
         
     if (EV_next is None):
         V, c, s = (u(m), m, np.zeros_like(m))
