@@ -5,7 +5,6 @@ import numpy as np
 
 
 
-#@jit
 def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv=None,uefun=None):
     #raise Exception('This should not work!')
     

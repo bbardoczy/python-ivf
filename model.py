@@ -128,7 +128,8 @@ class Model:
     def compute_V(self):
         #self.V =  [{ 'No children':None, 'One child, out':None, 'One child, in':None }]*self.setup.pars['T']
         self.V = list()
-        self.descriptions = ['No children', 'One child, out', 'One child, in','Two children, out', 'Two children, in']#[*self.V[0]]
+        #self.descriptions = ['No children, fertile', 'One child, out, fertile', 'One child, in, fertile','Two children, out, fertile', 'Two children, in, fertile']#[*self.V[0]]
+        self.descriptions = list(self.setup.u.keys())
         
         T = self.setup.pars['T']
         
@@ -147,7 +148,8 @@ class Model:
                 def get_V(desc):
                     
                     ma = s.zgs_Mats[desc][t]          
-                    Vcomb, MU_comb = ev_emu(Vnext,s.transitions[desc],mu=s.mu[desc])                
+                    trns = s.transitions_t[t][desc]
+                    Vcomb, MU_comb = ev_emu(Vnext,trns,mu=s.mu[desc])                
                     EV, EMU  = integrate(  Vcomb , ma ), integrate(  MU_comb , ma )  
                     VV = self.iterate(desc,t,EV,EMU)
                     return VV
@@ -159,40 +161,13 @@ class Model:
                 #self.V[t][desc] = self.vpack(Vcs,t,desc)
             
     
-    
-    
-    
-    def refactoring_check(self):
-        
-        V = self.V
-        it = 0
-    
-        try:
-            assert np.abs(V[it]["No children"][5,1000] - 60.04361005581497)<1e-10
-            assert np.abs(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000] + 4.605243004294415) < 1e-10
-            assert np.abs(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000] + 7.956746814857432 ) < 1e-10
-            print('Tests are ok!')
-        except:   
-            import matplotlib.pyplot as plt
-
-            # draw things and print diagnostic informatio
-            print(V[it]["No children"][5,1000])
-            print(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000])
-            print(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000])
-            plt.cla()
-            plt.subplot(211)
-            V[it][  "No children"  ].plot_value( ['s',['s','c',np.add],np.divide] )
-            V[it][  "One child, in"].plot_value( ['s',['s','c',np.add],np.divide] )
-            plt.subplot(212)
-            V[it]["No children"].plot_diff(V[it]["One child, in"],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
-            plt.legend()
-            raise Exception('Tests are not ok!')
-    
-    
 class Agents:
     def __init__(self,M,N=1000,T=None):
         if T is None:
             T = M.setup.pars['T']
+            
+        np.random.seed(18)    
+        
         self.iassets = np.zeros((N,T),np.int32)
         
         self.wassets = np.ones((N,T),np.float32)
@@ -200,7 +175,7 @@ class Agents:
         self.iexo[:,0] = np.random.randint(0,1000,size=N)
         #self.iassets[:,0] = np.random.randint(0,100,size=N)
         
-        self.state = np.zeros((N,T),np.int32)
+        self.state = np.ones((N,T),np.int32)
         self.M = M
         self.V = M.V
         self.setup = M.setup
@@ -293,7 +268,7 @@ class Agents:
             
             sname = self.state_names[ist]
             
-            transition = self.setup.transitions[sname]
+            transition = self.setup.transitions_t[t][sname]
             
             
             destinations = transition.elem_probabilities(Vnext)

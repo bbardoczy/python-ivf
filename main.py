@@ -14,7 +14,8 @@ This thing runs the main calculations for IVF project.
 
 from model import Model, Agents
 from timeit import default_timer
-from numpy import log 
+from numpy import log
+import numpy as np
 #from numba import jit
     
 #@jit
@@ -42,7 +43,7 @@ if __name__ == "__main__":
     start = default_timer()
 
     pars_in = dict(
-                    T = 40,
+                    T = 20,
                     sigma = 2,
                     R = 1.03,
                     beta = 0.95,
@@ -52,8 +53,10 @@ if __name__ == "__main__":
                     u_kid_add = [0.15, 0.25],
                     phi_in = 1,
                     phi_out = 0.4,
+                    pmar = 0.25, 
                     pback = 0.25, delta_out = 0.15,
                     eps  = 0.01,
+                    pbirth = 0.5,
                     amax = 100, na = 200,
                     a_z0 = 0.0, a_z1 = 0.00, a_z2 = 0.00,
                     a_g0 = 0.0, a_g1 = 0,
@@ -65,7 +68,21 @@ if __name__ == "__main__":
     
     
     
-    a, M = model_solve(pars_in,True)
+    #a, M = model_solve(pars_in,True)
+    
+    
+    target = 'delta_out'
+    
+    
+    #step = 5e-5
+    
+    #pars_in_change = pars_in.copy()
+    #pars_in_change[target] = pars_in[target]+step
+    a0, M0 = model_solve(pars_in,True)
+    #a1, M1 = model_solve(pars_in_change,True)
+    
+    #print('Changed for {} of agents'.format(np.mean(np.any(a0.state!=a1.state,axis=1))))
+    
     
     
     finish = default_timer()

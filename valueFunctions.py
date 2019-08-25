@@ -225,7 +225,7 @@ class valuefunction(gridval):
                 S += p[i]
             
             p = [j/S for j in p]
-            assert np.all(S >= 1.0)
+            #assert np.all(S >= 1.0), 'Min S is {}'.format(np.min(S))
             
         else:
             S = 1.0 # does not matter            
