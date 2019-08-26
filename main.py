@@ -21,7 +21,7 @@ import numpy as np
 #@jit
 def model_solve(pars,return_am=False):
     
-        M = Model(pars,"EGM")
+        M = Model(pars,"EGM-verbose")
         M.compute_V()
         #V = M.V
         #M.refactoring_check()
@@ -42,8 +42,11 @@ if __name__ == "__main__":
     
     start = default_timer()
 
-    pars_in = dict(
-                    T = 20,
+    pars_in = dict( 
+                    Tfer = 10,  # time infertility risk starts
+                    T = 20,     # time all infertile / stop simulations
+                    Tret = 20,  # time retire
+                    Tdie  = 60, # time die                   
                     sigma = 2,
                     R = 1.03,
                     beta = 0.95,
@@ -55,9 +58,9 @@ if __name__ == "__main__":
                     phi_out = 0.4,
                     pmar = 0.25, 
                     pback = 0.25, delta_out = 0.15,
-                    eps  = 0.01,
+                    eps  = 0.001,
                     pbirth = 0.5,
-                    amax = 100, na = 200,
+                    amax = 200, na = 200,
                     a_z0 = 0.0, a_z1 = 0.00, a_z2 = 0.00,
                     a_g0 = 0.0, a_g1 = 0,
                     sigma_z_init=0.15,sigma_z=0.1,nz=7,

@@ -44,8 +44,9 @@ class Model:
         #
         # this actually selects the iterator
         #
-        if name == "EGM":
+        if name == "EGM" or name=="EGM-verbose":
             
+            verbose = (name=="EGM-verbose")
             
             s = self.setup
             
@@ -53,6 +54,8 @@ class Model:
                 gri, ma = s.zgs_Grids[desc][t], s.zgs_Mats[desc][t]     
                 Vcs = Vnext_egm(s.agrid,s.labor_income[desc](gri,t),EV,EMU,ma,s.pars['R'],s.pars['beta'],u=s.u[desc],mu_inv=s.mu_inv[desc],uefun=s.ue[desc])                
                 
+                if verbose:
+                    print('Solved {} at t = {}'.format(desc,t))
                 
                 return vpack(Vcs,t,desc)
         
@@ -129,32 +132,47 @@ class Model:
         #self.V =  [{ 'No children':None, 'One child, out':None, 'One child, in':None }]*self.setup.pars['T']
         self.V = list()
         #self.descriptions = ['No children, fertile', 'One child, out, fertile', 'One child, in, fertile','Two children, out, fertile', 'Two children, in, fertile']#[*self.V[0]]
+        
         self.descriptions = list(self.setup.u.keys())
         
-        T = self.setup.pars['T']
+        T = self.setup.pars['Tdie']
         
         
-        integrate = lambda V, mat : np.dot(V,mat.T)   
+        
+        integrate = lambda V, mat : V if mat is None else np.dot(V,mat.T)   
         
         # this part is backward iteration
         for t in reversed(range(T)):
             
-            if t == T-1:
-                Vthis = [self.initialize(desc,t)  for desc in self.descriptions]
-            else:
-                Vnext = self.V[0]
-                s = self.setup
+            Vthis = list()
+            
+            s = self.setup
+            
+            for desc in self.descriptions:
+            
+                if t < s.time_limits[desc][0] or t >= s.time_limits[desc][1]:
+                    Vthis.append(None)
+                    continue
                 
-                def get_V(desc):
+                if t == T-1:
+                    Vthis.append(self.initialize(desc,t))
+                else:
                     
-                    ma = s.zgs_Mats[desc][t]          
-                    trns = s.transitions_t[t][desc]
-                    Vcomb, MU_comb = ev_emu(Vnext,trns,mu=s.mu[desc])                
-                    EV, EMU  = integrate(  Vcomb , ma ), integrate(  MU_comb , ma )  
-                    VV = self.iterate(desc,t,EV,EMU)
-                    return VV
+                    Vnext = self.V[0]
+                    
+                    
+                    def get_V(desc):
+                        
+                        ma = s.zgs_Mats[desc][t]          
+                        trns = s.transitions_t[t][desc]
+                        
+                        Vcomb, MU_comb = ev_emu(Vnext,trns,mu=s.mu[desc])                
+                        EV, EMU  = integrate(  Vcomb , ma ), integrate(  MU_comb , ma )  
+                        VV = self.iterate(desc,t,EV,EMU)
+                        return VV
                 
-                Vthis = [get_V(d) for d in self.descriptions]
+                    Vthis.append(get_V(desc))
+                
                 
             V_dict = dict(zip(self.descriptions,Vthis))
             self.V = [V_dict] + self.V
@@ -259,6 +277,8 @@ class Agents:
             ind = np.where(is_state)[0]
             
             for name in self.state_names:
+                if self.V[t+1][name] is None:
+                    continue
                 VV = self.V[t+1][name]['V']
                 V_i = VV[self.iassets[ind,t+1],self.iexo[ind,t+1]]
                 V_ip = VV[self.iassets[ind,t+1]+1,self.iexo[ind,t+1]]

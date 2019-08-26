@@ -61,7 +61,10 @@ class setupClass:
                 'One child, out, fertile': u_k,
                 'One child, in, fertile':  u_k,
                 'Two children, out, fertile': u_kk,
-                'Two children, in, fertile':  u_kk
+                'Two children, in, fertile':  u_kk,
+                'No children, retired':    u_nok,
+                'One child, retired':  u_k,
+                'Two children, retired':  u_kk
              }
         
         self.mu = {
@@ -70,7 +73,10 @@ class setupClass:
                 'One child, out, fertile': lambda x  : factor*(x**(-sigma)),
                 'One child, in, fertile':  lambda x  : factor*(x**(-sigma)),
                 'Two children, out, fertile': lambda x  : factor_2*(x**(-sigma)),
-                'Two children, in, fertile':  lambda x  : factor_2*(x**(-sigma))
+                'Two children, in, fertile':  lambda x  : factor_2*(x**(-sigma)),
+                'No children, retired':    lambda x  : (x**(-sigma)),
+                'One child, retired':  lambda x  : factor*(x**(-sigma)),
+                'Two children, retired':  lambda x  : factor_2*(x**(-sigma)),
              }
         
         self.mu_inv = {
@@ -80,6 +86,9 @@ class setupClass:
                   'One child, in, fertile':  lambda MU : ((MU/factor)**(-1/sigma)),
                   'Two children, out, fertile':  lambda MU : ((MU/factor_2)**(-1/sigma)),
                   'Two children, in, fertile':  lambda MU : ((MU/factor_2)**(-1/sigma)),
+                  'No children, retired':    lambda MU : (MU**(-1/sigma)),  
+                  'One child, retired': lambda MU : ((MU/factor)**(-1/sigma)),
+                  'Two children, retired': lambda MU : ((MU/factor_2)**(-1/sigma)),
                  }
             
         
@@ -89,7 +98,10 @@ class setupClass:
                 'One child, out, fertile': uenv.create(self.u['One child, out, fertile'],False),
                 'One child, in, fertile':  uenv.create(self.u['One child, in, fertile'],False),
                 'Two children, out, fertile': uenv.create(self.u['Two children, out, fertile'],False),
-                'Two children, in, fertile':  uenv.create(self.u['Two children, in, fertile'],False)
+                'Two children, in, fertile':  uenv.create(self.u['Two children, in, fertile'],False),
+                'No children, retired':    uenv.create(self.u['No children, retired'],False),
+                'One child, retired':    uenv.create(self.u['One child, retired'],False),
+                'Two children, retired':    uenv.create(self.u['Two children, retired'],False)
              }
         
 
@@ -143,7 +155,8 @@ class setupClass:
         zgs_GridList_kk_in,  zgs_MatList_kk_in   = generate_zgs(**a,fun = lambda g : np.maximum( g - pars['g_kid'][1], 0 ) )
         zgs_GridList_kk_out, zgs_MatList_kk_out  = generate_zgs(**a,fun = lambda g : -pars['delta_out'] )
         
-        
+        ret_grid = [np.array([0])]*pars['Tdie']
+        ret_mat =  [None]*pars['Tdie']
         
         self.zgs_Grids =    {
                             'Single': zgs_GridList_nok,
@@ -151,7 +164,10 @@ class setupClass:
                             'One child, out, fertile': zgs_GridList_k_out,
                             'One child, in, fertile': zgs_GridList_k_in,
                             'Two children, out, fertile': zgs_GridList_kk_out,
-                            'Two children, in, fertile': zgs_GridList_kk_in
+                            'Two children, in, fertile': zgs_GridList_kk_in,
+                            'No children, retired': ret_grid,
+                            'One child, retired':   ret_grid,
+                            'Two children, retired': ret_grid
                             }
         
         self.zgs_Mats  =    {
@@ -160,7 +176,10 @@ class setupClass:
                             'One child, out, fertile': zgs_MatList_k_out,
                             'One child, in, fertile': zgs_MatList_k_in,
                             'Two children, out, fertile': zgs_MatList_kk_out,
-                            'Two children, in, fertile': zgs_MatList_kk_in
+                            'Two children, in, fertile': zgs_MatList_kk_in,
+                            'No children, retired': ret_mat,
+                            'One child, retired':   ret_mat,
+                            'Two children, retired': ret_mat
                             }
         
 
@@ -180,6 +199,9 @@ class setupClass:
                         'One child, in, fertile':  lambda grid, t : pars['phi_in']*np.exp(grid[:,0] + grid[:,2]  - pars['z_kid'][0]  + self.ztrend[t]).T,
                         'Two children, out, fertile': lambda grid, t : pars['phi_out']*np.exp(grid[:,0] + grid[:,2] - pars['z_kid'][1]  + self.ztrend[t]).T,
                         'Two children, in, fertile':  lambda grid, t : pars['phi_in']*np.exp(grid[:,0] + grid[:,2]  - pars['z_kid'][1]  + self.ztrend[t]).T,
+                        'No children, retired':    lambda grid, t : None,
+                        'One child, retired':    lambda grid, t : None,
+                        'Two children, retired':    lambda grid, t : None    
                             }
         
 
@@ -190,7 +212,7 @@ class setupClass:
 
         from between_states import shock, choice, Offset
         
-        offset = [None,Offset(self.agrid,1e-3)]
+        offset = [None,Offset(self.agrid,self.pars['pbirth'])]
             
         
         new_baby = shock(['One child, out, fertile',"One child, in, fertile"],[1-pars['pback'],pars['pback']])
@@ -204,17 +226,48 @@ class setupClass:
             oc_out =  shock(["One child, out, fertile","One child, in, fertile"],[1-pars['pback'],pars['pback']])
         
         
+        
+        self.time_limits = {             'Single'      :    (0,pars['T']),
+                                'No children, fertile':     (0,pars['T']),
+                             'One child, out, fertile':     (1,pars['T']),
+                              'One child, in, fertile':     (1,pars['T']),
+                          'Two children, out, fertile':     (2,pars['T']),
+                           'Two children, in, fertile':     (2,pars['T']),
+                           'No children, retired'     :     (pars['T'],pars['Tdie']),
+                           'One child, retired'       :     (pars['T'],pars['Tdie']),
+                           'Two children, retired'    :     (pars['T'],pars['Tdie'])
+                           }
+        
+        
+        
+        
         self.transitions_t = list()
         
-        for t in range(self.pars['T']):
+        
+        
+        
+        
+        for t in range(self.pars['Tdie']):
             
             
-            
-            transitions = {             'Single'      :    shock(['Single', 'No children, fertile'],[1-pars['pmar'],pars['pmar']]),
-                                'No children, fertile':    choice(["No children, fertile",new_baby],pars['eps'],offset),
-                             'One child, out, fertile':    oc_out,
-                              'One child, in, fertile':    choice(["One child, in, fertile",new_baby_2],pars['eps'],offset),
-                          'Two children, out, fertile':    shock(["Two children, out, fertile","Two children, in, fertile"],[1-pars['pback'],pars['pback']]),
-                           'Two children, in, fertile':    choice(["Two children, in, fertile"],pars['eps'])}
+            if t < pars['T']-1:
+                transitions = {             'Single'      :    shock(['Single', 'No children, fertile'],[1-pars['pmar'],pars['pmar']]),
+                                    'No children, fertile':    choice(["No children, fertile",new_baby],pars['eps'],offset),
+                                 'One child, out, fertile':    oc_out,
+                                  'One child, in, fertile':    choice(["One child, in, fertile",new_baby_2],pars['eps'],offset),
+                              'Two children, out, fertile':    shock(["Two children, out, fertile","Two children, in, fertile"],[1-pars['pback'],pars['pback']]),
+                               'Two children, in, fertile':    choice(["Two children, in, fertile"],pars['eps'])}
+            elif t == pars['T'] - 1:
+                transitions = {             'Single'      :    choice(['No children, retired'],pars['eps']),
+                                    'No children, fertile':    choice(['No children, retired'],pars['eps']),
+                                 'One child, out, fertile':    choice(['One child, retired'],pars['eps']),
+                                  'One child, in, fertile':    choice(['One child, retired'],pars['eps']),
+                              'Two children, out, fertile':    choice(['Two children, retired'],pars['eps']),
+                               'Two children, in, fertile':    choice(['Two children, retired'],pars['eps'])}
+            else:
+                transitions = { 'No children, retired':  choice(['No children, retired'],pars['eps']),
+                                'One child, retired':    choice(['One child, retired'],pars['eps']),
+                                'Two children, retired':    choice(['Two children, retired'],pars['eps'])
+                              }
             self.transitions_t.append(transitions)
     
