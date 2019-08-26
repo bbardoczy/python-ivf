@@ -44,8 +44,9 @@ class Model:
         #
         # this actually selects the iterator
         #
-        if name == "EGM":
+        if name == "EGM" or name=="EGM-verbose":
             
+            verbose = (name=="EGM-verbose")
             
             s = self.setup
             
@@ -53,6 +54,8 @@ class Model:
                 gri, ma = s.zgs_Grids[desc][t], s.zgs_Mats[desc][t]     
                 Vcs = Vnext_egm(s.agrid,s.labor_income[desc](gri,t),EV,EMU,ma,s.pars['R'],s.pars['beta'],u=s.u[desc],mu_inv=s.mu_inv[desc],uefun=s.ue[desc])                
                 
+                if verbose:
+                    print('Solved {} at t = {}'.format(desc,t))
                 
                 return vpack(Vcs,t,desc)
         
@@ -128,71 +131,61 @@ class Model:
     def compute_V(self):
         #self.V =  [{ 'No children':None, 'One child, out':None, 'One child, in':None }]*self.setup.pars['T']
         self.V = list()
-        self.descriptions = ['No children', 'One child, out', 'One child, in']#[*self.V[0]]
+        #self.descriptions = ['No children, fertile', 'One child, out, fertile', 'One child, in, fertile','Two children, out, fertile', 'Two children, in, fertile']#[*self.V[0]]
         
-        T = self.setup.pars['T']
+        self.descriptions = list(self.setup.u.keys())
+        
+        T = self.setup.pars['Tdie']
         
         
-        integrate = lambda V, mat : np.dot(V,mat.T)   
+        
+        integrate = lambda V, mat : V if mat is None else np.dot(V,mat.T)   
         
         # this part is backward iteration
         for t in reversed(range(T)):
             
-            if t == T-1:
-                Vthis = [self.initialize(desc,t)  for desc in self.descriptions]
-            else:
-                Vnext = self.V[0]
-                s = self.setup
+            Vthis = list()
+            
+            s = self.setup
+            
+            for desc in self.descriptions:
+            
+                if t < s.time_limits[desc][0] or t >= s.time_limits[desc][1]:
+                    Vthis.append(None)
+                    continue
                 
-                def get_V(desc):
+                if t == T-1:
+                    Vthis.append(self.initialize(desc,t))
+                else:
                     
-                    ma = s.zgs_Mats[desc][t]          
-                    Vcomb, MU_comb = ev_emu(Vnext,s.transitions[desc],mu=s.mu[desc])                
-                    EV, EMU  = integrate(  Vcomb , ma ), integrate(  MU_comb , ma )  
-                    VV = self.iterate(desc,t,EV,EMU)
-                    return VV
+                    Vnext = self.V[0]
+                    
+                    
+                    def get_V(desc):
+                        
+                        ma = s.zgs_Mats[desc][t]          
+                        trns = s.transitions_t[t][desc]
+                        
+                        Vcomb, MU_comb = ev_emu(Vnext,trns,mu=s.mu[desc])                
+                        EV, EMU  = integrate(  Vcomb , ma ), integrate(  MU_comb , ma )  
+                        VV = self.iterate(desc,t,EV,EMU)
+                        return VV
                 
-                Vthis = [get_V(d) for d in self.descriptions]
+                    Vthis.append(get_V(desc))
+                
                 
             V_dict = dict(zip(self.descriptions,Vthis))
             self.V = [V_dict] + self.V
                 #self.V[t][desc] = self.vpack(Vcs,t,desc)
             
     
-    
-    
-    
-    def refactoring_check(self):
-        
-        V = self.V
-        it = 0
-    
-        try:
-            assert np.abs(V[it]["No children"][5,1000] - 60.04361005581497)<1e-10
-            assert np.abs(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000] + 4.605243004294415) < 1e-10
-            assert np.abs(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000] + 7.956746814857432 ) < 1e-10
-            print('Tests are ok!')
-        except:   
-            import matplotlib.pyplot as plt
-
-            # draw things and print diagnostic informatio
-            print(V[it]["No children"][5,1000])
-            print(V[it]["One child, in"][5,1000]-V[it]["No children"][5,1000])
-            print(V[it]["One child, out"][5,1000]-V[it]["No children"][5,1000])
-            plt.cla()
-            plt.subplot(211)
-            V[it][  "No children"  ].plot_value( ['s',['s','c',np.add],np.divide] )
-            V[it][  "One child, in"].plot_value( ['s',['s','c',np.add],np.divide] )
-            plt.subplot(212)
-            V[it]["No children"].plot_diff(V[it]["One child, in"],['s',['s','c',np.add],lambda x, y: np.divide(x,np.maximum(y,1)) ])
-            plt.legend()
-            raise Exception('Tests are not ok!')
-    
-    
 class Agents:
     def __init__(self,M,N=1000,T=None):
         if T is None:
             T = M.setup.pars['T']
+            
+        np.random.seed(18)    
+        
         self.iassets = np.zeros((N,T),np.int32)
         
         self.wassets = np.ones((N,T),np.float32)
@@ -200,7 +193,7 @@ class Agents:
         self.iexo[:,0] = np.random.randint(0,1000,size=N)
         #self.iassets[:,0] = np.random.randint(0,100,size=N)
         
-        self.state = np.zeros((N,T),np.int32)
+        self.state = np.ones((N,T),np.int32)
         self.M = M
         self.V = M.V
         self.setup = M.setup
@@ -234,15 +227,18 @@ class Agents:
             s_ip = self.V[t][sname]['s'][self.iassets[ind,t]+1,self.iexo[ind,t]].reshape(nst)
             w_i = self.wassets[ind,t].reshape(nst)
             anext_val =  w_i*s_i + (1-w_i)*s_ip 
+            
+            
             assert np.all(anext_val >= 0)
+            
             #print((agrid.shape[0],anext_val.shape[0]))
             try:
                 self.iassets[ind,t+1], self.wassets[ind,t+1], atest = interpolate_nostart(agrid,anext_val,agrid,xd_ordered=False)
             except:
                 print(t,agrid.shape,anext_val.shape, w_i, s_i, s_ip)
-                raise Exception('aa')
+                raise Exception('interpolator stopped working again')
                 
-            assert np.all(np.abs(atest - anext_val) < 1e-6)
+            assert np.all(np.abs(atest - anext_val) < 1e-2)
     
     def iexonext(self,t):
         # let's find out new state
@@ -281,6 +277,8 @@ class Agents:
             ind = np.where(is_state)[0]
             
             for name in self.state_names:
+                if self.V[t+1][name] is None:
+                    continue
                 VV = self.V[t+1][name]['V']
                 V_i = VV[self.iassets[ind,t+1],self.iexo[ind,t+1]]
                 V_ip = VV[self.iassets[ind,t+1]+1,self.iexo[ind,t+1]]
@@ -290,7 +288,7 @@ class Agents:
             
             sname = self.state_names[ist]
             
-            transition = self.setup.transitions[sname]
+            transition = self.setup.transitions_t[t][sname]
             
             
             destinations = transition.elem_probabilities(Vnext)

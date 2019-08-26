@@ -21,7 +21,9 @@ def create(ufunc,use_inv_w=False):
         use_inv_w (bool,optional): assume that the post decision value-of-choice vector is a negative inverse
     
     """
-
+    
+    #ufunc = njit(ufunc)
+    
     @njit
     def upperenvelope(grid_a,m_vec,c_vec,inv_w_vec,grid_m,c_ast_vec,v_ast_vec,*args):
         """ upperenvelope function

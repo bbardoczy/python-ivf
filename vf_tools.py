@@ -31,9 +31,9 @@ def v_optimize(m,agrid,beta,EV,ns=200,minc=0.001,u=None):
     if u is None:
         u = lambda x : np.log(x)
     
-    V = np.empty(m.shape,np.float64)
-    c = np.empty(m.shape,np.float64)
-    s = np.empty(m.shape,np.float64)
+    V = np.empty(m.shape,np.float)
+    c = np.empty(m.shape,np.float)
+    s = np.empty(m.shape,np.float)
     
     ns_low = int(ns/4)
     sshare = np.concatenate( (np.linspace(0,0.5,ns_low), np.linspace(0.5+(1/ns),1-minc,ns-ns_low)))
@@ -106,8 +106,8 @@ def v_optimize_one(EV_one,agrid,uc,ap,beta,transform):
     
     V_val  = uc + beta*EV_val
     
-    i_opt = np.empty(nm,np.int64)
-    V_opt = np.empty(nm,np.float64)
+    i_opt = np.empty(nm,np.int)
+    V_opt = np.empty(nm,np.float)
     
     #i_opt  = np.argmax(V_val, axis=1) # non njit-implementation
     
@@ -141,7 +141,7 @@ def smooth_p0(v0,v1,eps):
     
     
     if eps <= 1e-6:
-        return np.float64( v0 >= v1 )
+        return np.float( v0 >= v1 )
     else:
                 
         z = np.exp( (v1 - v0) / eps)        

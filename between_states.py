@@ -4,6 +4,7 @@ import numpy as np
 
 
 from valueFunctions import valuefunction
+from interp_my import interpolate_nostart
 
 
 class switch:
@@ -83,18 +84,24 @@ class switch:
         assert np.all(  np.abs( sum(out.values()) - 1 ) < 1e-6 ) 
         return out
     
-    
+    def apply_offset(self,vlist,put_inf=False):
+        if self.offset_list is None:
+            return vlist
+        else:
+            return [v if o is None else o.apply(v,put_inf) for (o,v) in zip(self.offset_list,vlist)]
+        
         
         
 
 class choice(switch):
-    def __init__(self,options,eps):
+    def __init__(self,options,eps,offset=None):
         self.options = options
         self.eps = eps        
         self.v0 = self.v0def(options)
         self.outcomes = self.elem_outcomes(self.options)
+        self.offset_list = offset
         
-        
+
         assert isinstance(options,list), 'Choices must be a list!'
         assert all([isinstance(i,(switch,str)) for i in options]), 'Unsupported thing in choices!'
     
@@ -113,11 +120,12 @@ class choice(switch):
     
         
 class shock(switch):
-    def __init__(self,options,ps):
+    def __init__(self,options,ps,offset=None):
         self.options = options
         self.ps      = ps        
         self.v0 = self.v0def(options)
         self.outcomes = self.elem_outcomes(self.options)
+        self.offset_list = offset
         
         assert np.abs(sum(ps) - 1)<1e-6
         assert isinstance(options,list), 'Options must be a list!'
@@ -125,6 +133,38 @@ class shock(switch):
         
     def probability(self,Vdict):
         return [p*np.ones_like(Vdict[self.v0]['V']) for p in self.ps]
+    
+    
+    
+    
+class Offset(object):
+    def __init__(self,agrid,price):
+        self.price = price
+        self.not_feasible = (agrid<price)
+        a_new = np.maximum(agrid-price,agrid[0])
+        self.i, self.w, acheck = interpolate_nostart(agrid,a_new,agrid,xd_ordered=True)
+        assert np.all(np.abs(a_new - acheck) < 1e-2)
+    
+    def apply(self,vin,put_inf=False):
+              
+        vout = self.w[:,np.newaxis]*vin[self.i,:] + (1-self.w[:,np.newaxis])*vin[self.i+1,:]
+            
+            
+        #if self.i[0] == 0 and self.i[1] == 0: assert np.all(vout[0,:] == vout[1,:])
+        if put_inf: vout[np.where(self.not_feasible),:] = -np.inf
+        if self.price==0: assert np.all(vout == vin)
+        
+        
+        return vout
+        
+        
+'''     
+if __name__ == "__main__":
+    agrid = M0.V[0]['No children, fertile'].grids[0].points
+    oo = Offset(agrid,4)
+    vout = oo.apply([M0.V[0]['No children, fertile'].V],put_inf=True)
+    print(vout)
+'''    
    
 def ev_emu(Vdict,transition,mu):
     
@@ -139,6 +179,11 @@ def ev_emu(Vdict,transition,mu):
     
     
     
+    Vbase = transition.apply_offset(Vbase,put_inf=True)
+    EMUbase = transition.apply_offset(EMUbase,put_inf=False)
+        
+    assert all([not np.any(np.isnan(v)) for v in Vbase])
+    assert all([not np.any(np.isnan(v)) for v in EMUbase])
     
     Vstart = Vdict[transition.v0]
     
