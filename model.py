@@ -265,7 +265,8 @@ class Agents:
         
         Vnext = dict().fromkeys(self.state_names,None)
         # interpolate next period's V
-        
+        # hese some V may be none if states are not present
+        # this is ok
         
         
         for ist in range(self.num_states):

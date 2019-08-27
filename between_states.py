@@ -9,6 +9,20 @@ from interp_my import interpolate_nostart
 
 class switch:
     
+    def __init__(self,options,offset=None):
+        self.options = options
+        self.v0 = self.v0def(options)
+        self.outcomes = self.elem_outcomes(self.options)
+        
+        if offset is None:        
+            offset = [Offset()]*len(options)
+        offset = [o if isinstance(o,Offset) else Offset() for o in offset]
+        self.offset_list = offset
+        
+        assert isinstance(options,list), 'Options must be a list!'
+        assert all([isinstance(i,(switch,str)) for i in options]), 'Unsupported thing in options!'
+
+        
     @staticmethod
     def v0def(opts):        
           
@@ -37,11 +51,11 @@ class switch:
     
     
     
-    def __probability_lt__(self,Vdict):
+    def __probability_lt__(self,vin):
         # this returns list of tuples
         
         
-        probs = self.probability(Vdict)
+        probs = self.probability(vin)
         output = list()
         
         
@@ -53,7 +67,7 @@ class switch:
                 output = output + [(opt,probs[i])]
             else:
                 assert isinstance(opt,switch)
-                output = output + [(opt.__probability_lt__(Vdict),probs[i])]
+                output = output + [(opt.__probability_lt__(vin),probs[i])]
                 
                 
         # this unpacks all multi-level tuples
@@ -70,11 +84,11 @@ class switch:
         return get_raw(output)
     
     
-    def elem_probabilities(self,Vdict):
+    def elem_probabilities(self,vin):
         # this collects output of __probability_lt__ that has repeatable items
         # into a nice dictionary of ultimate outcomes and their probabilities
         
-        lt = self.__probability_lt__(Vdict)
+        lt = self.__probability_lt__(vin)
         
         out = dict().fromkeys(self.outcomes,None)
         
@@ -95,11 +109,9 @@ class switch:
 
 class choice(switch):
     def __init__(self,options,eps,offset=None):
-        self.options = options
+        switch.__init__(self,options,offset=offset)
         self.eps = eps        
-        self.v0 = self.v0def(options)
-        self.outcomes = self.elem_outcomes(self.options)
-        self.offset_list = offset
+        
         
 
         assert isinstance(options,list), 'Choices must be a list!'
@@ -121,42 +133,41 @@ class choice(switch):
         
 class shock(switch):
     def __init__(self,options,ps,offset=None):
-        self.options = options
-        self.ps      = ps        
-        self.v0 = self.v0def(options)
-        self.outcomes = self.elem_outcomes(self.options)
-        self.offset_list = offset
-        
+        switch.__init__(self,options,offset=offset)
+        self.ps      = ps     
         assert np.abs(sum(ps) - 1)<1e-6
-        assert isinstance(options,list), 'Options must be a list!'
-        assert all([isinstance(i,(switch,str)) for i in options]), 'Unsupported thing in options!'
+        
         
     def probability(self,Vdict):
         return [p*np.ones_like(Vdict[self.v0]['V']) for p in self.ps]
     
     
-    
-    
+# this is an offset for transitions
 class Offset(object):
-    def __init__(self,agrid,price):
-        self.price = price
-        self.not_feasible = (agrid<price)
-        a_new = np.maximum(agrid-price,agrid[0])
-        self.i, self.w, acheck = interpolate_nostart(agrid,a_new,agrid,xd_ordered=True)
-        assert np.all(np.abs(a_new - acheck) < 1e-2)
+    def __init__(self,agrid=None,price=0):
+        if agrid is None:
+            self.has_offset = False
+        else:  
+            self.has_offset = True
+            self.agrid = agrid
+            self.price = price
+            self.not_feasible = (agrid<price)
+            a_new = np.maximum(agrid-price,agrid[0])
+            self.i, self.w, acheck = interpolate_nostart(agrid,a_new,agrid,xd_ordered=True)
+            assert np.all(np.abs(a_new - acheck) < 1e-2)
     
     def apply(self,vin,put_inf=False):
-              
-        vout = self.w[:,np.newaxis]*vin[self.i,:] + (1-self.w[:,np.newaxis])*vin[self.i+1,:]
-            
-            
-        #if self.i[0] == 0 and self.i[1] == 0: assert np.all(vout[0,:] == vout[1,:])
-        if put_inf: vout[np.where(self.not_feasible),:] = -np.inf
-        if self.price==0: assert np.all(vout == vin)
+        if self.has_offset:    
+            vout = self.w[:,np.newaxis]*vin[self.i,:] + (1-self.w[:,np.newaxis])*vin[self.i+1,:]
+                
+            #if self.i[0] == 0 and self.i[1] == 0: assert np.all(vout[0,:] == vout[1,:])
+            if put_inf: vout[np.where(self.not_feasible),:] = -np.inf
+            if self.price==0: assert np.all(vout == vin)
         
-        
-        return vout
-        
+            return vout
+        else:
+            return vin
+       
         
 '''     
 if __name__ == "__main__":
@@ -166,26 +177,79 @@ if __name__ == "__main__":
     print(vout)
 '''    
    
-def ev_emu(Vdict,transition,mu):
-    
-    Vbase = [Vdict[opt]['V'] if (type(opt) is str)
-             else ev_emu(Vdict,opt,mu)[0]
-             for opt in transition.options]
-    
-    
-    EMUbase = [mu(Vdict[opt]['c']) if (type(opt) is str)
-                else ev_emu(Vdict,opt,mu)[1]
-                for opt in transition.options]
-    
-    
-    
-    Vbase = transition.apply_offset(Vbase,put_inf=True)
-    EMUbase = transition.apply_offset(EMUbase,put_inf=False)
+
+
+# this is input for ev_emu, that can be either whole bunch of value functions
+# or value functions and coordinate
+class Vin(object):
+    def __init__(self,Vdict,at=None):
+        self.Vdict = Vdict
+        self._hasat = False
+        if at is not None:
+            assert type(at) is tuple
+            assert len(at) == 2
+            self.hasat = True
+            self.at_i = at[0]
+            self.at_w = at[1]
         
+    
+    #def _at(self,vin):
+    #    if not self._hasat:
+    #        return vin
+    #    else:
+    #        assert vin.ndim == 2
+    #        vin_i  = vin[self.at_i,:]
+    #        vin_ip = vin[self.at_i+1,:]
+    #        vin_out = self.at_w[:,np.newaxis]*vin_i + (1-self.at_w[:,np.newaxis])*vin_ip
+    #        return vin_out
+        
+    def __getitem__(self, key): return self.Vdict[key]
+    
+    def v_mu(self,opt,mu): # this returns pair of v and marginal utility
+        return self[opt]['V'], mu(self[opt]['c'])
+
+
+def ev_emu(vin,transition,mu,has_at=False):
+    
+    '''
+    at = lambda v : v
+    
+    if has_at:
+        def at(v):
+            assert vin.ndim == 2
+            v_i  = v[vin.at_i,:]
+            v_ip = v[vin.at_i+1,:]
+            v_out = vin.at_w[:,np.newaxis]*v_i + (1-vin.at_w[:,np.newaxis])*v_ip
+            return v_out
+    '''
+    
+    
+    
+    if type(vin) is dict:
+        vin = Vin(vin)
+    
+    
+    apply_to_tuple = lambda x, o : ( o.apply(x[0], put_inf=True) , o.apply(x[1]) )
+    
+    Vbase, EMUbase = zip(
+                            *[
+                                  apply_to_tuple( 
+                                        vin.v_mu(opt,mu), o 
+                                                ) 
+                                    if (type(opt) is str) else 
+                                  apply_to_tuple(
+                                        ev_emu(vin,opt,mu), o
+                                                ) 
+                               for opt, o in
+                                  zip(transition.options,transition.offset_list)
+                              ]
+                        )
+    
+    
     assert all([not np.any(np.isnan(v)) for v in Vbase])
     assert all([not np.any(np.isnan(v)) for v in EMUbase])
     
-    Vstart = Vdict[transition.v0]
+    Vstart = vin[transition.v0]
     
     if len(Vbase)==1:
         return Vstart['V'], mu(Vstart['c'])
