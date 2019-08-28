@@ -7,7 +7,7 @@ This is the main file
 
 
 import numpy as np
-from between_states import ev_emu
+from between_states import ev_emu, at_iw
 from valueFunctions import valuefunction, grid_dim_linear, grid_dim_discrete
 from grids_and_functions import setupClass
 from vf_iterators import Vnext_egm, Vnext_vfi
@@ -189,6 +189,7 @@ class Agents:
         self.iassets = np.zeros((N,T),np.int32)
         
         self.wassets = np.ones((N,T),np.float32)
+        self.assets = np.empty((N,T))
         self.iexo = np.zeros((N,T),np.int32)
         self.iexo[:,0] = np.random.randint(0,1000,size=N)
         #self.iassets[:,0] = np.random.randint(0,100,size=N)
@@ -233,6 +234,7 @@ class Agents:
             
             #print((agrid.shape[0],anext_val.shape[0]))
             try:
+                self.assets[ind,t+1] = anext_val
                 self.iassets[ind,t+1], self.wassets[ind,t+1], atest = interpolate_nostart(agrid,anext_val,agrid,xd_ordered=False)
             except:
                 print(t,agrid.shape,anext_val.shape, w_i, s_i, s_ip)
@@ -263,10 +265,13 @@ class Agents:
             
     def state_next(self,t):
         
-        Vnext = dict().fromkeys(self.state_names,None)
         # interpolate next period's V
         # hese some V may be none if states are not present
         # this is ok
+        
+        
+        
+        agrid = self.setup.agrid
         
         
         for ist in range(self.num_states):
@@ -274,25 +279,40 @@ class Agents:
             if not np.any(is_state):
                 continue
             
+            Vnext = dict().fromkeys(self.state_names,None)
+        
             nind = np.sum(is_state)
             ind = np.where(is_state)[0]
-            
-            for name in self.state_names:
-                if self.V[t+1][name] is None:
-                    continue
-                VV = self.V[t+1][name]['V']
-                V_i = VV[self.iassets[ind,t+1],self.iexo[ind,t+1]]
-                V_ip = VV[self.iassets[ind,t+1]+1,self.iexo[ind,t+1]]
-                V_int = self.wassets[ind,t+1]*V_i + (1-self.wassets[ind,t+1])*V_ip
-                Vnext[name] = {'V': V_int,'c': self.V[t+1][name]['c'][self.iassets[ind,t+1],self.iexo[ind,t+1]]}
-            
             
             sname = self.state_names[ist]
             
             transition = self.setup.transitions_t[t][sname]
             
             
+            for name in transition.outcomes:
+                if self.V[t+1][name] is None:
+                    continue
+                VV = self.V[t+1][name]['V']
+                V_int = VV[:,self.iexo[ind,t+1]] #at_iw(VV[:,self.iexo[ind,t+1]],self.iassets[ind,t+1],self.wassets[ind,t+1])
+                #assert (V_int.shape == VV[:,self.iexo[ind,t+1]].shape)
+                # this collects V for ALL asset levels
+                # this is required so we can apply offset
+                assert V_int.ndim==2
+                Vnext[name] = {'V': V_int,'c': np.abs(V_int)}
+            
+            
+            
             destinations = transition.elem_probabilities(Vnext)
+            
+            for d in destinations.keys():
+                destinations[d] = np.diag(at_iw(destinations[d], self.iassets[ind,t+1],self.wassets[ind,t+1]))
+                assert destinations[d].size == nind
+            
+            
+            
+            
+            
+            # inside elem_probabilities there is ev_emu
             
             new_states = np.arange(self.num_states)
             state_probs = np.zeros((nind,self.num_states),np.float32)
@@ -304,13 +324,36 @@ class Agents:
             assert np.all(np.abs(np.sum(state_probs,axis=1) - 1)<1e-5)
                 
             # this is probably very slow
+            
+            offsets = np.zeros(nind)
             for j in range(nind):
                 self.state[ind[j],t+1] = np.random.choice(new_states,size=1,p=state_probs[j,:].squeeze())
-            
+                offsets[j] = transition.offset_prices[self.state_names[self.state[ind[j],t+1]]]
+                
+            if not np.any(offsets>0): continue
         
+            i_change = ind[np.where(offsets>0)]
+            
+            
+            self.assets[i_change,t+1] = self.assets[i_change,t+1] - offsets[np.where(offsets>0)]
+            self.iassets[i_change,t+1], self.wassets[i_change,t+1], atest = interpolate_nostart(agrid,self.assets[i_change,t+1],agrid,xd_ordered=False)
+            
+            assert np.all(self.assets[ind,t+1] >= -1e-3)
+            # now let's adjust a
+    '''        
+    def iwnext(self,t):
+        # this converts asset values to indices
+        agrid = self.setup.agrid
+        
+        self.iassets[:,t+1], self.wassets[:,t+1], atest = interpolate_nostart(agrid,self.assets[:,t+1],agrid,xd_ordered=False)
+        assert np.all(np.abs(atest - self.assets[:,t+1]) < 1e-2)
+    '''
     
     def simulate(self):
         for t in range(self.T-1):
             self.anext(t)
             self.iexonext(t)
             self.state_next(t)
+            
+            
+            
