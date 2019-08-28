@@ -13,10 +13,7 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
         
     if m is None: # we can override m
         m = np.array( R*agrid[:,np.newaxis] + labor_income, np.float )
-        
-    
-    dc = True
-        
+       
     
     if EV_next is not None and EV_next.shape[1] == 1:
         assert EMU_next.shape[1] == 1
@@ -49,8 +46,6 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
             
             if not np.all(np.diff(m_of_anext[:,i])>0):
                 
-                assert dc, "Non-monotonic m with no switching?"
-                
                 uecount += 1
                 # use upper envelope routine
                 
@@ -60,7 +55,7 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
                 
                 m_i = m[:,i]
                 
-                assert np.all( np.diff(m_i) > 0)
+                #assert np.all( np.diff(m_i) > 0)
                 
                 #m_extra = np.append(m_i,(1.05*m_i[-1],1.1*m_i[-1],1.2*m_i[-1]))
                 
