@@ -5,7 +5,7 @@ import numpy as np
 
 from valueFunctions import valuefunction
 from interp_my import interpolate_nostart
-
+from numba import jit
 
 class switch:
     
@@ -112,9 +112,10 @@ class switch:
         elif isinstance(key,(tuple,list)): 
             assert len(key)>1, "Please unpack all indices"
             try:
-                return self[key[0]][key[1:]]
+                k2 = key[1] if len(key)==2 else key[1:]
+                return self[key[0]][k2]
             except:
-                raise Exception('unsupported key')
+                raise Exception('unsupported key {}'.format(key))
         else:
             raise Exception('unsupported key')
    
@@ -251,8 +252,6 @@ if __name__ == "__main__":
 
 # this is input for ev_emu, that can be either whole bunch of value functions
 # or value functions and coordinate
-
-
 
 def ev_emu(vin,transition,mu,no_offset=False,return_p=False):
     

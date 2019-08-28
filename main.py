@@ -44,8 +44,9 @@ if __name__ == "__main__":
 
     pars_in = dict( 
                     Tfer = 10,  # time infertility risk starts
-                    T = 25,     # time all infertile / stop simulations
-                    Tret = 25,  # time retire
+                    Tinf = 25,     # time all infertile / stop simulations
+                    Tin = 30,   # time cannot be out of lf anymore (technical)
+                    Tret = 40,  # time retire                    
                     Tdie  = 60, # time die                   
                     sigma = 2,
                     R = 1.03,
@@ -56,10 +57,10 @@ if __name__ == "__main__":
                     u_kid_add = [0.15, 0.25],
                     phi_in = 1,
                     phi_out = 0.4,
-                    pmar = 0.25, 
+                    pmar = 0.25, pinf = 0.2,
                     pback = 0.25, delta_out = 0.15,
                     eps  = 0.001,
-                    Pbirth_f = 0.5, Pbirth_ivf = 20,
+                    Pbirth_f = 0.5, Pbirth_ivf = 5,
                     amax = 200, na = 200,
                     a_z0 = 0.0, a_z1 = 0.00, a_z2 = 0.00,
                     a_g0 = 0.0, a_g1 = 0,

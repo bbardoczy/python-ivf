@@ -135,7 +135,8 @@ class setupClass:
         zcoefs = [pars['a_z0'],pars['a_z1'],pars['a_z2']]
         gcoefs = [pars['a_g0'],pars['a_g1']]
         
-        trange = np.arange(0,pars['T'])
+        trange = np.arange(0,pars['Tret'])
+        trange[pars['Tinf']:] = pars['Tinf']-1
         
         if normalize_T:
             trange = trange/np.mean(trange)
@@ -159,7 +160,7 @@ class setupClass:
         
         a = dict(sigma_z_init=pars['sigma_z_init'],sigma_z=pars['sigma_z'],nz=pars['nz'],
                      sigma_g=pars['sigma_g'],rho_g=pars['rho_g'],ng=pars['ng'],smin=0,smax=pars['smax'],ns=pars['ns'],
-                     T=pars['T'],mult=self.gtrend)
+                     T=pars['Tret'],mult=self.gtrend)
         
         zgs_GridList_nok,    zgs_MatList_nok   = generate_zgs(**a)
         zgs_GridList_k_in,  zgs_MatList_k_in   = generate_zgs(**a,fun = lambda g : np.maximum( g - pars['g_kid'][0], 0 ) )
@@ -233,33 +234,24 @@ class setupClass:
 
         from between_states import shock, choice, Offset
         
-        offset_f = [None,Offset(self.agrid,self.pars['Pbirth_f'])]
-            
-        
-        new_baby = shock(['One child, out, fertile',"One child, in, fertile"],[1-pars['pback'],pars['pback']])
-        new_baby_2 = shock(['Two children, out',"Two children, in"],[1-pars['pback'],pars['pback']])
-
-
-
-        if new_from_out:
-            oc_out =  choice([shock(["One child, out, fertile","One child, in, fertile"],[1-pars['pback'],pars['pback']]),'Two children, out'],pars['eps'],offset_f)
-        else:
-            oc_out =  shock(["One child, out, fertile","One child, in, fertile"],[1-pars['pback'],pars['pback']])
+        offset_f   = [None,Offset(self.agrid,self.pars['Pbirth_f'])]
+        offset_ivf = [None,Offset(self.agrid,self.pars['Pbirth_ivf'])]
         
         
         
-        self.time_limits = {            'Single'      :    (0,pars['T']),
-                                'No children, fertile':     (0,pars['T']),
-                             'One child, out, fertile':     (1,pars['T']),
-                              'One child, in, fertile':     (1,pars['T']),
-                                   'Two children, out':     (2,pars['T']),
-                                    'Two children, in':     (2,pars['T']),
-                              'No children, infertile':     (0,0),
-                           'One child, out, infertile':     (1,0),
-                            'One child, in, infertile':     (1,0),
-                           'No children, retired'     :     (pars['T'],pars['Tdie']),
-                           'One child, retired'       :     (pars['T'],pars['Tdie']),
-                           'Two children, retired'    :     (pars['T'],pars['Tdie'])
+        
+        self.time_limits = {            'Single'      :     (0,pars['Tfer']),
+                                'No children, fertile':     (0,pars['Tinf']),
+                             'One child, out, fertile':     (1,pars['Tinf']),
+                              'One child, in, fertile':     (1,pars['Tinf']),
+                                   'Two children, out':     (2,pars['Tin']),
+                                    'Two children, in':     (2,pars['Tret']),
+                              'No children, infertile':     (pars['Tfer'],pars['Tret']),
+                           'One child, out, infertile':     (pars['Tfer'],pars['Tin']),
+                            'One child, in, infertile':     (pars['Tfer'],pars['Tret']),
+                           'No children, retired'     :     (pars['Tret'],pars['Tdie']),
+                           'One child, retired'       :     (pars['Tret'],pars['Tdie']),
+                           'Two children, retired'    :     (pars['Tret'],pars['Tdie'])
                            }
         
         
@@ -274,21 +266,101 @@ class setupClass:
         for t in range(self.pars['Tdie']):
             
             
-            if t < pars['T']-1:
+            if t < pars['Tfer']:
+                # everyone is fertile, no infertility risk
+                
+                new_baby = shock(['One child, out, fertile',"One child, in, fertile"],[1-pars['pback'],pars['pback']])
+                new_baby_2 = shock(['Two children, out',"Two children, in"],[1-pars['pback'],pars['pback']])
+        
+        
+                
+                if new_from_out:
+                    oc_out =  choice([shock(["One child, out, fertile","One child, in, fertile"],[1-pars['pback'],pars['pback']]),'Two children, out'],pars['eps'],offset_f)
+                else:
+                    oc_out =  shock(["One child, out, fertile","One child, in, fertile"],[1-pars['pback'],pars['pback']])
+                
+                
+                
                 transitions = {             'Single'      :    shock(['Single', 'No children, fertile'],[1-pars['pmar'],pars['pmar']]),
                                     'No children, fertile':    choice(["No children, fertile",new_baby],pars['eps'],offset_f),
                                  'One child, out, fertile':    oc_out,
                                   'One child, in, fertile':    choice(["One child, in, fertile",new_baby_2],pars['eps'],offset_f),
                                        'Two children, out':    shock(["Two children, out","Two children, in"],[1-pars['pback'],pars['pback']]),
                                         'Two children, in':    choice(["Two children, in"],pars['eps'])}
-            elif t == pars['T'] - 1:
-                transitions = {             'Single'      :    choice(['No children, retired'],pars['eps']),
-                                    'No children, fertile':    choice(['No children, retired'],pars['eps']),
-                                 'One child, out, fertile':    choice(['One child, retired'],pars['eps']),
-                                  'One child, in, fertile':    choice(['One child, retired'],pars['eps']),
-                                       'Two children, out':    choice(['Two children, retired'],pars['eps']),
-                                        'Two children, in':    choice(['Two children, retired'],pars['eps'])}
+                
+                # stop being single after 30
+                if t == pars['Tfer']-1:
+                    transitions['Single'] = choice(['No children, fertile'],pars['eps'])
+                
+                
+            elif t >= pars['Tfer'] and t < pars['Tinf'] - 1:
+                # infertility risk starts striking
+                
+                #new_nok = shock( ['No children, fertile','No children, infertile'], [ 1 - pars['pinf'], pars['pinf'] ] )
+                new_k_out   = shock( ['One child, out, fertile','One child, out, infertile'], [ 1 - pars['pinf'], pars['pinf'] ] )
+                new_k_in   = shock(  ['One child, in, fertile','One child, in, infertile'], [ 1 - pars['pinf'],   pars['pinf'] ] )
+                new_kk_out   = shock( ['Two children, out'], [1] )
+                new_kk_in   =  shock(  ['Two children, in'], [1] )
+                
+                new_baby     = shock([new_k_out,new_k_in],[1-pars['pback'],pars['pback']])
+                new_baby_2 = shock([new_kk_out,new_kk_in],[1-pars['pback'],pars['pback']])
+                
+                new_baby_ivf     = shock(['One child, out, infertile','One child, in, infertile'],[1-pars['pback'],pars['pback']])
+                new_baby_2_ivf   = shock([new_kk_out,new_kk_in],[1-pars['pback'],pars['pback']])
+                
+                
+                if new_from_out:
+                    oc_out =  choice([shock([new_k_out,new_k_in],[1-pars['pback'],pars['pback']]),new_baby_2],pars['eps'],offset_f)
+                    oc_out_ivf =  choice([shock(["One child, out, infertile","One child, in, infertile"],[1-pars['pback'],pars['pback']]),new_baby_2_ivf],pars['eps'],offset_ivf)
+                else:
+                    oc_out =  shock([new_k_out,new_k_in],[1-pars['pback'],pars['pback']])
+                    oc_out_ivf =  shock(["One child, out, infertile","One child, in, infertile"],[1-pars['pback'],pars['pback']])
+                
+                
+                transitions = {            
+                                    'No children, fertile':    choice(["No children, fertile",new_baby],pars['eps'],offset_f),
+                                 'One child, out, fertile':    oc_out,
+                                  'One child, in, fertile':    choice(["One child, in, fertile",new_baby_2],pars['eps'],offset_f),
+                                  'No children, infertile':    choice(["No children, infertile",new_baby_ivf],pars['eps'],offset_ivf),
+                               'One child, out, infertile':    oc_out_ivf,
+                                'One child, in, infertile':    choice(["One child, in, infertile",new_baby_2_ivf],pars['eps'],offset_ivf),                                       
+                                       'Two children, out':    shock(["Two children, out","Two children, in"],[1-pars['pback'],pars['pback']]),
+                                        'Two children, in':    choice(["Two children, in"],pars['eps'])}
+            elif t == pars['Tinf'] - 1:
+                # everyone is infertile, no ivf anymore, but people can stay out
+                # single females marry somehow
+                transitions = {             
+                                    'No children, fertile':    choice(['No children, infertile'],pars['eps']),
+                                 'One child, out, fertile':    shock(['One child, out, infertile','One child, in, infertile'],[1-pars['pback'],pars['pback']]),
+                                  'One child, in, fertile':    choice(['One child, in, infertile'],pars['eps']),
+                                  'No children, infertile':    choice(['No children, infertile'],pars['eps']),
+                               'One child, out, infertile':    shock(['One child, out, infertile','One child, in, infertile'],[1-pars['pback'],pars['pback']]),
+                                'One child, in, infertile':    choice(["One child, in, infertile"],pars['eps']),                                       
+                                       'Two children, out':    shock(["Two children, out","Two children, in"],[1-pars['pback'],pars['pback']]),
+                                        'Two children, in':    choice(["Two children, in"],pars['eps'])}
+            elif t >= pars['Tinf'] and t < pars['Tin']:
+                # everyone who was out gets in, everyone is infertile
+                transitions = {  
+                                  'No children, infertile':    choice(['No children, infertile'],pars['eps']),
+                               'One child, out, infertile':    choice(['One child, in, infertile'],pars['eps']),
+                                'One child, in, infertile':    choice(["One child, in, infertile"],pars['eps']),                                       
+                                       'Two children, out':    choice(["Two children, in"],pars['eps']),
+                                        'Two children, in':    choice(["Two children, in"],pars['eps'])}
+            elif t >= pars['Tin'] and t < pars['Tret'] - 1:
+                # stay infertile, work
+                transitions = {  
+                                  'No children, infertile':    choice(['No children, infertile'],pars['eps']),                               
+                                'One child, in, infertile':    choice(["One child, in, infertile"],pars['eps']),                                       
+                                        'Two children, in':    choice(["Two children, in"],pars['eps'])}
+                
+            elif t == pars['Tret'] - 1:
+                # retire in this period
+                transitions = {  
+                                  'No children, infertile':    choice(['No children, retired'],pars['eps']),                               
+                                'One child, in, infertile':    choice(["One child, retired"],pars['eps']),                                       
+                                        'Two children, in':    choice(["Two children, retired"],pars['eps'])}
             else:
+                # stay retired
                 transitions = {  'No children, retired':  choice(['No children, retired'],pars['eps']),
                                    'One child, retired':    choice(['One child, retired'],pars['eps']),
                                 'Two children, retired':    choice(['Two children, retired'],pars['eps'])

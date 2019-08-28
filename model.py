@@ -13,7 +13,7 @@ from grids_and_functions import setupClass
 from vf_iterators import Vnext_egm, Vnext_vfi
 from interp_my import interpolate_nostart
 from mc_tools import mc_simulate
-
+from numba import jit
 
 class Model:
     def __init__(self,pars,iterator_name="EGM"):
@@ -128,6 +128,7 @@ class Model:
     
     
     # this actually solves the model for V
+    
     def compute_V(self):
         #self.V =  [{ 'No children':None, 'One child, out':None, 'One child, in':None }]*self.setup.pars['T']
         self.V = list()
@@ -182,7 +183,7 @@ class Model:
 class Agents:
     def __init__(self,M,N=1000,T=None):
         if T is None:
-            T = M.setup.pars['T']
+            T = M.setup.pars['Tinf']
             
         np.random.seed(18)    
         
