@@ -9,7 +9,7 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
     #raise Exception('This should not work!')
     
     if labor_income is None:
-        labor_income = np.array([0.01])
+        labor_income = np.array([0.4])
         
     if m is None: # we can override m
         m = np.array( R*agrid[:,np.newaxis] + labor_income, np.float )
@@ -53,7 +53,6 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
                 
                 uecount += 1
                 # use upper envelope routine
-                
                 
                 
                 assert np.all(c_of_anext>0)
