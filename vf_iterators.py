@@ -4,7 +4,6 @@ import numpy as np
 #from numba import jit
 
 
-
 def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv=None,uefun=None):
     #raise Exception('This should not work!')
     
@@ -55,11 +54,6 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
                 
                 m_i = m[:,i]
                 
-                #assert np.all( np.diff(m_i) > 0)
-                
-                #m_extra = np.append(m_i,(1.05*m_i[-1],1.1*m_i[-1],1.2*m_i[-1]))
-                
-                
                 (c_i, V_i) = (np.empty_like(m_of_anext[:,i]), np.empty_like(m_of_anext[:,i]))
                 uefun(agrid,m_of_anext[:,i],c_of_anext[:,i],beta*EV_next[:,i],m_i,c_i,V_i)
                     
@@ -67,35 +61,6 @@ def Vnext_egm(agrid,labor_income,EV_next,EMU_next,Pi,R,beta,m=None,u=None,mu_inv
                 V[:,i] = V_i#[:m_i.size]
                 s[:,i] = m[:,i] - c[:,i]
                 
-                
-                
-                # this is debugger
-                '''
-                try:
-                    assert np.all(c[:,i]>0)
-                except:
-                    import matplotlib.pyplot as plt
-                    
-                    
-                    
-                    #print(c[:,i])
-                    
-                    from vf_tools import v_optimize
-                    Vv, cc, ss = v_optimize(m_i[:,np.newaxis],agrid,beta,EV_next[:,i][:,np.newaxis],ns=200,u=u)                    
-                    
-                    print(m[:,i])
-                    plt.subplot(211)
-                    plt.scatter(m_of_anext[:,i],c_of_anext[:,i],label="pre-UE")
-                    plt.scatter(m[:,i],c_i,label="post-UE")
-                    plt.scatter(m[:,i],cc,label="vfi")
-                    plt.subplot(212)
-                    plt.scatter(agrid,EV_next[:,i])
-                    plt.legend()
-                    
-                    plt.pause(0.05)
-                    #print((m[:,i],m_of_anext[:,i],c_of_anext[:,i],s[:,i]))
-                    raise Exception('wow')
-                '''  
                 
             else:
                 
@@ -127,7 +92,7 @@ def Vnext_vfi(agrid,labor_income,EV_next,c_next,Pi,R,beta,m=None,u=None,mu=None,
     from vf_tools import v_optimize
     
     if labor_income is None:
-        labor_income = np.array([0])
+        labor_income = np.array([0.4])
         
         
     if EV_next is not None and EV_next.shape[1] == 1:

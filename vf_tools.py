@@ -106,8 +106,8 @@ def v_optimize_one(EV_one,agrid,uc,ap,beta,transform):
     
     V_val  = uc + beta*EV_val
     
-    i_opt = np.empty(nm,np.int)
-    V_opt = np.empty(nm,np.float)
+    i_opt = np.empty(nm,np.int32)
+    V_opt = np.empty(nm,np.float32)
     
     #i_opt  = np.argmax(V_val, axis=1) # non njit-implementation
     

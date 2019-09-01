@@ -15,13 +15,13 @@ This thing runs the main calculations for IVF project.
 from model import Model, Agents
 from timeit import default_timer
 from numpy import log
-import numpy as np
+#import numpy as np
 #from numba import jit
     
 #@jit
 def model_solve(pars,return_am=False):
     
-        M = Model(pars,"EGM-verbose")
+        M = Model(pars,"EGM")
         M.compute_V()
         #V = M.V
         #M.refactoring_check()
